@@ -4,8 +4,8 @@ import utils
 from writer import Writer
 
 
-class MemoryTool(Writer):
-    TEST_DURATION = 10 * 60  # 10 minutes
+class MemoryTool:
+    TEST_DURATION = 60 * 60  # 30 minutes
     LOG_INTERVAL = 30  # 30 seconds
     last_total_memory = 0
     last_timestamp = 0
@@ -22,7 +22,7 @@ class MemoryTool(Writer):
                 continue
             if found_app_summary:
                 if label in line:
-                    line_splits = line.split()
+                    # line_splits = line.split() // for debug purposes
                     if label == "TOTAL PSS":
                         return line.split()[2]
                     if label in ["Code:", "Stack:", "Graphics:"]:
@@ -35,7 +35,7 @@ class MemoryTool(Writer):
 
     def process_meminfo(self, timestamp):
         result = subprocess.run(
-            ["adb", "shell", "dumpsys", "meminfo", package_name],
+            ["adb", "shell", "dumpsys", "meminfo", self.package_name],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
