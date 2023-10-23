@@ -1,11 +1,12 @@
 import subprocess
 import time
 import utils
-from writer import Writer
+import logging
 
 
 class MemoryTool:
-    TEST_DURATION = 60 * 60  # 30 minutes
+    is_monitoring = True
+    TEST_DURATION = 5 * 60  # 30 minutes
     LOG_INTERVAL = 30  # 30 seconds
     last_total_memory = 0
     last_timestamp = 0
@@ -22,7 +23,6 @@ class MemoryTool:
                 continue
             if found_app_summary:
                 if label in line:
-                    # line_splits = line.split() // for debug purposes
                     if label == "TOTAL PSS":
                         return line.split()[2]
                     if label in ["Code:", "Stack:", "Graphics:"]:
@@ -56,14 +56,15 @@ class MemoryTool:
 
     def start_monitoring(self):
         utils.Utils().print_info(self.package_name)
+
         try:
             elapsed_time = 0
-            while elapsed_time < self.TEST_DURATION:
+            while self.is_monitoring and elapsed_time < self.TEST_DURATION:
                 timestamp = int(time.time())
                 self.process_meminfo(timestamp)
 
                 if elapsed_time % self.LOG_INTERVAL == 0:
-                    print(
+                    logging.info(
                         f"[{timestamp}] Monitoring in progress... (Total Memory: {self.last_total_memory/1024}MB)"
                     )
 
@@ -72,17 +73,12 @@ class MemoryTool:
                 elapsed_time += self.LOG_INTERVAL
             self.writer.plot_data_from_csv()
 
-        except KeyboardInterrupt:
-            print("\nMonitoring script has been manually terminated.")
-            print("\nPlotting memory data from CSV file...")
+        except Exception as e:
+            self.stop_monitoring()
+            logging.error(f"Error during memory monitoring: {e}")
+            logging.info("\nPlotting memory data from CSV file...")
             self.writer.plot_data_from_csv()
 
-
-if __name__ == "__main__":
-    # you would get the package name via argument parser
-    package_name = "com.sygic.profi.beta.debug"
-
-    writer = Writer()
-    memory_tool = MemoryTool(writer, package_name)
-
-    memory_tool.start_monitoring()
+    def stop_monitoring(self):
+        self.is_monitoring = False
+        logging.info("Memory monitoring has been stopped.")

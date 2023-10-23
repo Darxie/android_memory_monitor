@@ -3,6 +3,7 @@ import plotter
 import subprocess
 from datetime import datetime
 from pathlib import Path
+import logging
 
 directory = Path("output")
 # Get the current timestamp in a specific format
@@ -12,6 +13,10 @@ timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 CSV_FILE = directory / f"memory_usage_{timestamp}.csv"
 LOGCAT_FILE = directory / f"logcat_sygic_tag_{timestamp}.txt"
 CRASH_LOG_FILE = directory / f"crash_log_{timestamp}.txt"
+
+FATAL_EXCEPTION_LOOKAHEAD = (
+    10  # Number of lines to look ahead for package name after a FATAL EXCEPTION
+)
 
 
 class Writer:
@@ -46,35 +51,70 @@ class Writer:
     def plot_data_from_csv(self):
         plotter.plot_memory_data(CSV_FILE)
 
-    def capture_sygic_log(self, package_name):
-        logcat_cmd = ["adb", "logcat", "-d", package_name]
-        logcat_output = subprocess.run(
-            logcat_cmd, capture_output=True, text=True
-        ).stdout
-        if "FATAL EXCEPTION" in logcat_output:
-            filtered_logs = [
-                line for line in logcat_output.splitlines() if package_name in line
-            ]
-            if filtered_logs:
-                # if the app crashed, filter the logs and plot the memory data graph and exit
-                print("The app seems to have crashed. Relevant logs:")
-                for log in filtered_logs:
-                    print(log)
-                    with open(CRASH_LOG_FILE, "a") as f:
-                        f.write(log + "\n")
-                self.plot_data_from_csv()
-                exit(0)
-            else:
-                print("No crashes found for the specified app.")
-        else:
-            with open(LOGCAT_FILE, "a") as f:
-                output = subprocess.run(
-                    ["adb", "logcat", "-d", "-s", "SYGIC"],
-                    capture_output=True,
-                    text=True,
-                ).stdout
-                for line in output.splitlines()[1:]:
-                    f.write(line + "\n")
+    @staticmethod
+    def _get_logcat_output(cmd_args):
+        """
+        Execute a logcat command and return its output.
 
-                subprocess.run(["adb", "logcat", "-c"])
-                print(f"Logs with tag 'SYGIC' have been saved to {LOGCAT_FILE}")
+        :param cmd_args: List of command components.
+        :return: stdout of the command execution.
+        """
+        try:
+            return subprocess.run(
+                cmd_args,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+            ).stdout
+        except Exception as e:
+            logging.error(f"Error executing logcat command {cmd_args}: {e}")
+            return ""
+
+    @staticmethod
+    def _write_to_file(filename, content):
+        """
+        Append content to a file.
+
+        :param filename: Name of the file.
+        :param content: Content to append.
+        """
+        try:
+            with open(filename, "a") as f:
+                f.write(content)
+        except Exception as e:
+            logging.error(f"Error writing to file {filename}: {e}")
+
+    def _app_crashed(self, logcat_output, package_name):
+        """
+        Check if the app crashed by looking for FATAL EXCEPTION related to the package name.
+
+        :param logcat_output: The full logcat output.
+        :param package_name: The app package name.
+        :return: True if crash detected, False otherwise.
+        """
+        lines = logcat_output.splitlines()
+        for i in range(len(lines)):
+            if "FATAL EXCEPTION" in lines[i]:
+                for j in range(i, min(i + FATAL_EXCEPTION_LOOKAHEAD, len(lines))):
+                    if package_name in lines[j]:
+                        return True
+        return False
+
+    def capture_sygic_log(self, package_name):
+        logcat_output = self._get_logcat_output(["adb", "logcat", "-d"])
+
+        if self._app_crashed(logcat_output, package_name):
+            logging.warning("The app seems to have crashed. Capturing full logs.")
+            self._write_to_file(CRASH_LOG_FILE, logcat_output)
+            self.plot_data_from_csv()
+            exit(0)
+        else:
+            sygic_logs = "\n".join(
+                self._get_logcat_output(
+                    ["adb", "logcat", "-d", "-s", "SYGIC"]
+                ).splitlines()[1:]
+            )
+            self._write_to_file(LOGCAT_FILE, sygic_logs + "\n")
+            subprocess.run(["adb", "logcat", "-c"])
+            logging.info(f"Logs with tag 'SYGIC' have been saved to {LOGCAT_FILE}")
