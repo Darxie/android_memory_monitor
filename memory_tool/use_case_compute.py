@@ -1,5 +1,4 @@
 import time
-import uiautomator2
 
 
 def simulate_user_interactions(device, memory_tool):

@@ -4,6 +4,7 @@ import subprocess
 from datetime import datetime
 from pathlib import Path
 import logging
+import utils
 
 directory = Path("output")
 # Get the current timestamp in a specific format
@@ -53,26 +54,6 @@ class Writer:
         plotter.plot_memory_data(CSV_FILE)
 
     @staticmethod
-    def _get_logcat_output(cmd_args):
-        """
-        Execute a logcat command and return its output.
-
-        :param cmd_args: List of command components.
-        :return: stdout of the command execution.
-        """
-        try:
-            return subprocess.run(
-                cmd_args,
-                capture_output=True,
-                text=True,
-                encoding="utf-8",
-                errors="replace",
-            ).stdout
-        except Exception as e:
-            logging.error(f"Error executing logcat command {cmd_args}: {e}")
-            return ""
-
-    @staticmethod
     def _write_to_file(filename, content):
         """
         Append content to a file.
@@ -103,7 +84,7 @@ class Writer:
         return False
 
     def capture_sygic_log(self, package_name):
-        logcat_output = self._get_logcat_output(["adb", "logcat", "-d"])
+        logcat_output = utils.execute_adb_command(["adb", "logcat", "-d"])
 
         if self._app_crashed(logcat_output, package_name):
             logging.warning("The app seems to have crashed. Capturing full logs.")
@@ -112,7 +93,7 @@ class Writer:
             exit(0)
         else:
             sygic_logs = "\n".join(
-                self._get_logcat_output(
+                utils.execute_adb_command(
                     ["adb", "logcat", "-d", "-s", "SYGIC"]
                 ).splitlines()[1:]
             )

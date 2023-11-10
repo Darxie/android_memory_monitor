@@ -1,8 +1,7 @@
 import uiautomator2 as u2
-from utils import Utils
+import utils
 import logging
 import threading
-import subprocess
 import use_case_demonstrate
 import use_case_compute
 
@@ -20,12 +19,11 @@ def initialize_device(package_name):
     Initialize connection to the Android device and launch the application.
     """
 
-    deviceId = Utils().get_device_id()
+    deviceId = utils.get_device_id()
     device = u2.connect(deviceId)
     logging.info(f"Connected to device: \n{deviceId}  \n{device.info}")
     device.screen_on()
-    running_apps = device.app_list_running()
-    subprocess.run(
+    utils.execute_adb_command(
         [
             "adb",
             "shell",
@@ -41,7 +39,7 @@ def initialize_device(package_name):
         logging.error(f"App {package_name} failed to start!")
         exit(1)
 
-    subprocess.run(["adb", "logcat", "-c"])
+    utils.execute_adb_command(["adb", "logcat", "-c"])
     return device
 
 
@@ -57,7 +55,7 @@ def run_automation_tasks(package_name):
     memory_tool = MemoryTool(writer, package_name, monitoring_finished_event)
     thread = threading.Thread(target=memory_tool.start_monitoring).start()
 
-    Utils().print_app_info(device, package_name)
+    utils.print_app_info(device, package_name)
 
     # User Interaction Event
     use_case_demonstrate.simulate_user_interactions(device, memory_tool)

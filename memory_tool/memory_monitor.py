@@ -6,7 +6,6 @@ import logging
 
 class MemoryTool:
     is_monitoring = True
-    TEST_DURATION = 12 * 60 * 60  # 30 minutes
     LOG_INTERVAL = 60  # 30 seconds
     last_total_memory = 0
     last_timestamp = 0
@@ -38,14 +37,11 @@ class MemoryTool:
 
     def process_meminfo(self):
         timestamp = int(time.time())
-        result = subprocess.run(
-            ["adb", "shell", "dumpsys", "meminfo", self.package_name],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
+        result = utils.execute_adb_command(
+            ["adb", "shell", "dumpsys", "meminfo", self.package_name]
         )
 
-        data_lines = result.stdout.split("\n")
+        data_lines = result.split("\n")
         total_memory = self.extract_memory_info("TOTAL PSS", data_lines)
         self.last_total_memory = int(total_memory)
         java_heap = self.extract_memory_info("Java Heap:", data_lines)
@@ -59,18 +55,17 @@ class MemoryTool:
         )
 
     def start_monitoring(self):
-        utils.Utils().print_info(self.package_name)
+        utils.print_info(self.package_name)
 
         try:
             while self.is_monitoring:
-                self.process_meminfo()
-
                 if self.elapsed_time % self.LOG_INTERVAL == 0:
+                    self.process_meminfo()
                     logging.info(
                         f" Monitoring in progress... (Total Memory: {self.last_total_memory/1024}MB)"
                     )
 
-                self.check_for_crashes() #ToDo SDC-10346
+                self.check_for_crashes()  # ToDo SDC-10346
                 time.sleep(self.check_interval)
                 self.elapsed_time += self.check_interval
 
