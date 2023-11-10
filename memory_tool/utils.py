@@ -21,6 +21,7 @@ def execute_adb_command(command_list) -> str:
             text=True,
             encoding="utf-8",
             errors="replace",
+            check=False
         )
         return result.stdout
     except Exception as e:
@@ -30,7 +31,8 @@ def execute_adb_command(command_list) -> str:
 def get_app_pid(package_name) -> str:
     """
     Get the process ID (PID) for a given app package name.
-    The PID is typically the second field, but it's best to check based on the layout of your `ps` output.
+    The PID is typically the second field, but it's best to check based 
+    on the layout of your `ps` output.
 
     :param package_name: Name of the app package.
     :return: PID as a string if found, None otherwise.

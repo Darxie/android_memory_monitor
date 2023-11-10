@@ -29,6 +29,15 @@ def simulate_user_interactions(device, memory_tool):
 
 
 def tap_search_bar(device):
+    """
+    Taps on the search bar of the Sygic app.
+
+    Args:
+        device: The device object representing the Android device.
+
+    Returns:
+        None
+    """
     device.xpath(
         '//*[@resource-id="com.sygic.profi.beta:id/composeView_searchBar"]/android.view.View[1]/android.view.View[1]'
     ).click()

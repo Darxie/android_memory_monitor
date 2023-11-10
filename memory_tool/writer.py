@@ -1,10 +1,10 @@
 import csv
-import plotter
 import subprocess
 from datetime import datetime
 from pathlib import Path
 import logging
 import utils
+import plotter
 
 directory = Path("output")
 # Get the current timestamp in a specific format
@@ -26,7 +26,7 @@ class Writer:
             directory.mkdir(parents=True)
 
         # Initialize CSV file with headers
-        with open(CSV_FILE, mode="w", newline="") as file:
+        with open(CSV_FILE, mode="w", newline="", encoding="utf-8") as file:
             writer = csv.writer(file)
             writer.writerow(
                 [
@@ -43,7 +43,7 @@ class Writer:
     def write_data(
         self, timestamp, total_memory, java_heap, native_heap, code, stack, graphics
     ):
-        with open(CSV_FILE, mode="a", newline="") as file:
+        with open(CSV_FILE, mode="a", newline="", encoding="utf-8") as file:
             writer = csv.writer(file)
             writer.writerow(
                 [timestamp, total_memory, java_heap, native_heap, code, stack, graphics]
@@ -62,7 +62,7 @@ class Writer:
         :param content: Content to append.
         """
         try:
-            with open(filename, "a") as f:
+            with open(filename, "a", encoding="utf-8") as f:
                 f.write(content)
         except Exception as e:
             logging.error(f"Error writing to file {filename}: {e}")

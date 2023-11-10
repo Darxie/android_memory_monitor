@@ -1,7 +1,8 @@
-import uiautomator2 as u2
+import sys
 import utils
 import logging
 import threading
+import uiautomator2 as u2
 import use_case_demonstrate
 import use_case_compute
 
@@ -19,9 +20,9 @@ def initialize_device(package_name):
     Initialize connection to the Android device and launch the application.
     """
 
-    deviceId = utils.get_device_id()
-    device = u2.connect(deviceId)
-    logging.info(f"Connected to device: \n{deviceId}  \n{device.info}")
+    device_id = utils.get_device_id()
+    device = u2.connect(device_id)
+    logging.info(f"Connected to device: \n{device_id}  \n{device.info}")
     device.screen_on()
     utils.execute_adb_command(
         [
@@ -37,13 +38,21 @@ def initialize_device(package_name):
         pass
     else:
         logging.error(f"App {package_name} failed to start!")
-        exit(1)
+        sys.exit(1)
 
     utils.execute_adb_command(["adb", "logcat", "-c"])
     return device
 
-
 def run_automation_tasks(package_name):
+    """
+    Runs automation tasks for the given package name.
+
+    Args:
+        package_name (str): The name of the package to run automation tasks for.
+
+    Returns:
+        None
+    """
     device = initialize_device(package_name)
 
     # Set up synchronization event
@@ -53,7 +62,7 @@ def run_automation_tasks(package_name):
     writer = Writer()
 
     memory_tool = MemoryTool(writer, package_name, monitoring_finished_event)
-    thread = threading.Thread(target=memory_tool.start_monitoring).start()
+    threading.Thread(target=memory_tool.start_monitoring).start()
 
     utils.print_app_info(device, package_name)
 

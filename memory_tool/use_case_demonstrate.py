@@ -30,7 +30,20 @@ def simulate_user_interactions(device, memory_tool):
     device.watcher.start()
 
 
+import time
+
 def stop_demonstrate(device, memory_tool):
+    """
+    Stops the demonstration by clicking the stop button, swiping up, and cancelling the route.
+    Also stops the memory monitoring.
+
+    Args:
+        device: The device object used to interact with the Android device.
+        memory_tool: The memory tool object used to monitor memory usage.
+
+    Returns:
+        None
+    """
     device.xpath(
         '//*[@resource-id="com.sygic.profi.beta:id/mapInfoAnimator"]/android.widget.LinearLayout[1]/android.widget.ImageView[2]'
     ).click()  # press stop
@@ -45,6 +58,15 @@ def stop_demonstrate(device, memory_tool):
 
 
 def tap_search_bar(device):
+    """
+    Taps on the search bar of the Sygic app.
+
+    Args:
+        device: The device object representing the Android device.
+
+    Returns:
+        None
+    """
     device.xpath(
         '//*[@resource-id="com.sygic.profi.beta:id/composeView_searchBar"]/android.view.View[1]/android.view.View[1]'
     ).click()

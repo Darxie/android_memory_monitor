@@ -1,10 +1,14 @@
-import subprocess
 import time
-import utils
 import logging
+import utils
 
 
 class MemoryTool:
+    """
+    A class that provides functionality to monitor memory usage of an Android app.
+
+    """
+
     is_monitoring = True
     LOG_INTERVAL = 60  # 30 seconds
     last_total_memory = 0
@@ -18,6 +22,16 @@ class MemoryTool:
         self.monitoring_finished_event = monitoring_finished_event
 
     def extract_memory_info(self, label, data) -> str:
+        """
+        Extracts memory information from the given data based on the provided label.
+
+        Args:
+            label (str): The label to search for in the data.
+            data (List[str]): The list of strings containing memory information.
+
+        Returns:
+            str: The extracted memory information as a string.
+        """
         found_app_summary = False
         for line in data:
             if "App Summary" in line:
@@ -36,6 +50,10 @@ class MemoryTool:
         self.writer.capture_sygic_log(self.package_name)
 
     def process_meminfo(self):
+        """
+        Extracts memory information using adb shell dumpsys meminfo command 
+        and writes it to a file.
+        """
         timestamp = int(time.time())
         result = utils.execute_adb_command(
             ["adb", "shell", "dumpsys", "meminfo", self.package_name]
@@ -55,6 +73,9 @@ class MemoryTool:
         )
 
     def start_monitoring(self):
+        """
+        Starts monitoring the memory usage of the specified package.
+        """
         utils.print_info(self.package_name)
 
         try:
@@ -62,7 +83,8 @@ class MemoryTool:
                 if self.elapsed_time % self.LOG_INTERVAL == 0:
                     self.process_meminfo()
                     logging.info(
-                        f" Monitoring in progress... (Total Memory: {self.last_total_memory/1024}MB)"
+                        f" Monitoring in progress... 
+                        (Total Memory: {self.last_total_memory/1024}MB)"
                     )
 
                 self.check_for_crashes()  # ToDo SDC-10346
@@ -76,6 +98,9 @@ class MemoryTool:
             self.stop_monitoring()
 
     def stop_monitoring(self):
+        """
+        Stops the memory monitoring process and logs the elapsed time.
+        """
         self.is_monitoring = False
         logging.info("Elapsed time: " + str(self.elapsed_time) + " seconds.")
         if self.monitoring_finished_event:
