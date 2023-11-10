@@ -49,6 +49,7 @@ class Writer:
             )
 
     def plot_data_from_csv(self):
+        logging.info("\nPlotting memory data from CSV file...")
         plotter.plot_memory_data(CSV_FILE)
 
     @staticmethod

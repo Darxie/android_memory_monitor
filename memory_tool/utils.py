@@ -74,3 +74,6 @@ class Utils:
             logging.info(f"Device ID: {device_id}")
 
         logging.info("Printing device information completed.\n\n")
+
+    def print_app_info(self, device, package_name):
+        logging.info(device.app_info(package_name))

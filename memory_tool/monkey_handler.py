@@ -1,9 +1,10 @@
-from uiautomator import Device
+import uiautomator2 as u2
 from utils import Utils
-import time
 import logging
 import threading
 import subprocess
+import use_case_demonstrate
+import use_case_compute
 
 from writer import Writer
 from memory_monitor import MemoryTool
@@ -14,14 +15,16 @@ logging.basicConfig(
 )
 
 
-def initialize_device():
+def initialize_device(package_name):
     """
     Initialize connection to the Android device and launch the application.
     """
+
     deviceId = Utils().get_device_id()
-    device = Device(deviceId)
+    device = u2.connect(deviceId)
     logging.info(f"Connected to device: \n{deviceId}  \n{device.info}")
-    device.screen.on()
+    device.screen_on()
+    running_apps = device.app_list_running()
     subprocess.run(
         [
             "adb",
@@ -29,51 +32,42 @@ def initialize_device():
             "am",
             "start",
             "-n",
-            "com.sygic.profi.beta.debug/com.sygic.aura.activity.NaviNativeActivity",
+            "com.sygic.profi.beta/com.sygic.aura.activity.NaviNativeActivity",
         ]
     )
+    if device.app_wait(package_name, front=True):
+        pass
+    else:
+        logging.error(f"App {package_name} failed to start!")
+        exit(1)
+
     subprocess.run(["adb", "logcat", "-c"])
-    time.sleep(10)
     return device
 
 
-def simulate_user_interactions(device):
-    """
-    Simulate user interactions on the device.
-    """
-    device(text="Address, GPS or Station").click()
-    time.sleep(2)
-    device(resourceId="com.sygic.profi.beta.debug:id/inputField").set_text("Cuneo")
-    time.sleep(2)
-    device(
-        resourceId="com.sygic.profi.beta.debug:id/searchItemTitle",
-        text="Cuneo",
-    ).click()
-    time.sleep(1)
+def run_automation_tasks(package_name):
+    device = initialize_device(package_name)
 
-    device.click(550, 2200)
-    time.sleep(10)  # depends on the device's compute performance. adjust accordingly
-    device(
-        resourceId="com.sygic.profi.beta.debug:id/routePlannerDetailBottomSheetContent"
-    ).swipe.up(steps=10)
-    time.sleep(1)
-    device(text="Demonstrate route").click()
-
-
-def run_automation_tasks():
-    device = initialize_device()
+    # Set up synchronization event
+    monitoring_finished_event = threading.Event()
 
     # Start Monitoring Event
-    package_name = "com.sygic.profi.beta.debug"
     writer = Writer()
 
-    memory_tool = MemoryTool(writer, package_name)
+    memory_tool = MemoryTool(writer, package_name, monitoring_finished_event)
     thread = threading.Thread(target=memory_tool.start_monitoring).start()
 
+    Utils().print_app_info(device, package_name)
+
     # User Interaction Event
-    simulate_user_interactions(device)
+    use_case_demonstrate.simulate_user_interactions(device, memory_tool)
+    logging.info("Automation tasks completed, monitoring still running")
+    monitoring_finished_event.wait()
+
+    writer.plot_data_from_csv()
 
 
 if __name__ == "__main__":
-    run_automation_tasks()
-    print("Automation tasks completed, monitoring still running")
+    package_name = "com.sygic.profi.beta"
+    # subprocess.run(["python3 -m uiautomator2 init"])
+    run_automation_tasks(package_name)

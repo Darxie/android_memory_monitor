@@ -6,14 +6,17 @@ import logging
 
 class MemoryTool:
     is_monitoring = True
-    TEST_DURATION = 5 * 60  # 30 minutes
-    LOG_INTERVAL = 30  # 30 seconds
+    TEST_DURATION = 12 * 60 * 60  # 30 minutes
+    LOG_INTERVAL = 60  # 30 seconds
     last_total_memory = 0
     last_timestamp = 0
+    elapsed_time = 0
+    check_interval = 5
 
-    def __init__(self, writer, package_name):
+    def __init__(self, writer, package_name, monitoring_finished_event=None):
         self.writer = writer
         self.package_name = package_name
+        self.monitoring_finished_event = monitoring_finished_event
 
     def extract_memory_info(self, label, data) -> str:
         found_app_summary = False
@@ -33,7 +36,8 @@ class MemoryTool:
     def check_for_crashes(self):
         self.writer.capture_sygic_log(self.package_name)
 
-    def process_meminfo(self, timestamp):
+    def process_meminfo(self):
+        timestamp = int(time.time())
         result = subprocess.run(
             ["adb", "shell", "dumpsys", "meminfo", self.package_name],
             stdout=subprocess.PIPE,
@@ -58,27 +62,27 @@ class MemoryTool:
         utils.Utils().print_info(self.package_name)
 
         try:
-            elapsed_time = 0
-            while self.is_monitoring and elapsed_time < self.TEST_DURATION:
-                timestamp = int(time.time())
-                self.process_meminfo(timestamp)
+            while self.is_monitoring:
+                self.process_meminfo()
 
-                if elapsed_time % self.LOG_INTERVAL == 0:
+                if self.elapsed_time % self.LOG_INTERVAL == 0:
                     logging.info(
-                        f"[{timestamp}] Monitoring in progress... (Total Memory: {self.last_total_memory/1024}MB)"
+                        f" Monitoring in progress... (Total Memory: {self.last_total_memory/1024}MB)"
                     )
 
-                self.check_for_crashes()
-                time.sleep(self.LOG_INTERVAL)
-                elapsed_time += self.LOG_INTERVAL
-            self.writer.plot_data_from_csv()
+                self.check_for_crashes() #ToDo SDC-10346
+                time.sleep(self.check_interval)
+                self.elapsed_time += self.check_interval
 
         except Exception as e:
-            self.stop_monitoring()
             logging.error(f"Error during memory monitoring: {e}")
-            logging.info("\nPlotting memory data from CSV file...")
-            self.writer.plot_data_from_csv()
+
+        finally:
+            self.stop_monitoring()
 
     def stop_monitoring(self):
         self.is_monitoring = False
+        logging.info("Elapsed time: " + str(self.elapsed_time) + " seconds.")
+        if self.monitoring_finished_event:
+            self.monitoring_finished_event.set()
         logging.info("Memory monitoring has been stopped.")
