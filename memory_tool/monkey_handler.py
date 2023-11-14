@@ -5,6 +5,8 @@ import threading
 import uiautomator2 as u2
 import use_case_demonstrate
 import use_case_compute
+import use_case_fg_bg
+import use_case_search
 
 from writer import Writer
 from memory_monitor import MemoryTool
@@ -34,14 +36,15 @@ def initialize_device(package_name):
             "com.sygic.profi.beta/com.sygic.aura.activity.NaviNativeActivity",
         ]
     )
+    utils.execute_adb_command(["adb", "logcat", "-c"])
     if device.app_wait(package_name, front=True):
         pass
     else:
         logging.error(f"App {package_name} failed to start!")
         sys.exit(1)
 
-    utils.execute_adb_command(["adb", "logcat", "-c"])
     return device
+
 
 def run_automation_tasks(package_name):
     """
@@ -67,7 +70,7 @@ def run_automation_tasks(package_name):
     utils.print_app_info(device, package_name)
 
     # User Interaction Event
-    use_case_demonstrate.simulate_user_interactions(device, memory_tool)
+    use_case_search.simulate_user_interactions(device, memory_tool)
     logging.info("Automation tasks completed, monitoring still running")
     monitoring_finished_event.wait()
 
@@ -76,5 +79,4 @@ def run_automation_tasks(package_name):
 
 if __name__ == "__main__":
     package_name = "com.sygic.profi.beta"
-    # subprocess.run(["python3 -m uiautomator2 init"])
     run_automation_tasks(package_name)
