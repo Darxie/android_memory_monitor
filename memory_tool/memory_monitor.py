@@ -83,8 +83,7 @@ class MemoryTool:
                 if self.elapsed_time % self.LOG_INTERVAL == 0:
                     self.process_meminfo()
                     logging.info(
-                        f" Monitoring in progress... 
-                        (Total Memory: {self.last_total_memory/1024}MB)"
+                        f" Monitoring in progress... (Total Memory: {self.last_total_memory/1024}MB)"
                     )
 
                 self.check_for_crashes()  # ToDo SDC-10346

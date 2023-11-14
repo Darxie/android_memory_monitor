@@ -19,9 +19,9 @@ def simulate_user_interactions(device, memory_tool):
         ).click()
         time.sleep(1)
 
-        device.click(550, 2200)
+        device(text="Get directions").click()
         time.sleep(
-            10
+            15
         )  # depends on the device's compute performance. adjust accordingly
 
         device.press("back")
