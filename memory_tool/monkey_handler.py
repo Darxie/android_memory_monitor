@@ -7,6 +7,7 @@ import use_case_demonstrate
 import use_case_compute
 import use_case_fg_bg
 import use_case_search
+from timestamp import ExecutionTimestamp
 
 from writer import Writer
 from memory_monitor import MemoryTool
@@ -24,7 +25,7 @@ def initialize_device(package_name):
 
     device_id = utils.get_device_id()
     device = u2.connect(device_id)
-    device.app_stop(package_name) # force close app if running
+    device.app_stop(package_name)  # force close app if running
     logging.info(f"Connected to device: \n{device_id}  \n{device.info}")
     device.screen_on()
     utils.execute_adb_command(
@@ -57,6 +58,10 @@ def run_automation_tasks(package_name, use_case):
     Returns:
         None
     """
+
+    # initialize timestamp
+    ExecutionTimestamp.get_timestamp()
+
     device = initialize_device(package_name)
 
     # Set up synchronization event

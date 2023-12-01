@@ -1,5 +1,14 @@
 import subprocess
 import logging
+from pathlib import Path
+from timestamp import ExecutionTimestamp
+
+
+timestamp = ExecutionTimestamp.get_timestamp()
+directory = Path(f"output/{timestamp}")
+
+# Construct filenames with the timestamp
+INFO_FILE = directory / f"app_info.txt"
 
 
 def execute_adb_command(command_list) -> str:
@@ -21,17 +30,18 @@ def execute_adb_command(command_list) -> str:
             text=True,
             encoding="utf-8",
             errors="replace",
-            check=False
+            check=False,
         )
         return result.stdout
     except Exception as e:
         logging.error(f"Error executing ADB command {command_list}: {e}")
         return ""
 
+
 def get_app_pid(package_name) -> str:
     """
     Get the process ID (PID) for a given app package name.
-    The PID is typically the second field, but it's best to check based 
+    The PID is typically the second field, but it's best to check based
     on the layout of your `ps` output.
 
     :param package_name: Name of the app package.
@@ -45,6 +55,7 @@ def get_app_pid(package_name) -> str:
                 parts = line.split()
                 return parts[1]
     return "None"
+
 
 def get_device_id() -> str:
     """
@@ -60,6 +71,7 @@ def get_device_id() -> str:
             return lines[1].split()[0]
     logging.warning("No devices found!")
     exit(1)
+
 
 def print_info(package_name):
     """
@@ -80,5 +92,24 @@ def print_info(package_name):
 
     logging.info("Printing device information completed.\n\n")
 
+
 def print_app_info(device, package_name):
-    logging.info(device.app_info(package_name))
+    app_info = device.app_info(package_name)
+    logging.info(app_info)
+
+    _write_to_file(INFO_FILE, str(device.info))
+    _write_to_file(INFO_FILE, str(app_info))
+
+
+def _write_to_file(filename, content):
+    """
+    Append content to a file.
+
+    :param filename: Name of the file.
+    :param content: Content to append.
+    """
+    try:
+        with open(filename, "a", encoding="utf-8") as f:
+            f.write(content)
+    except Exception as e:
+        logging.error(f"Error writing to file {filename}: {e}")

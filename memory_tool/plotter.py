@@ -1,14 +1,14 @@
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
-from datetime import datetime
 from pathlib import Path
 import matplotlib.dates as mdates
 import logging
+from timestamp import ExecutionTimestamp
 
-directory = Path("output")
-# Get the current timestamp in a specific format
-timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+timestamp = ExecutionTimestamp.get_timestamp()
+directory = Path(f"output/{timestamp}")
 
 IMAGE = directory / f"memory_stacked_line_chart_{timestamp}.png"
 IMAGE_TOTAL_MEMORY = directory / f"memory_total_{timestamp}.png"
@@ -37,7 +37,7 @@ def plot_total_memory(csv_file):
     plt.ylabel(f"Total Memory Usage ({memory_unit})")
     plt.tight_layout()
 
-    plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%H:%M'))
+    plt.gca().xaxis.set_major_formatter(mdates.DateFormatter("%H:%M"))
     plt.gca().xaxis.set_major_locator(mdates.HourLocator())
 
     plt.xticks(rotation=45)
@@ -46,7 +46,7 @@ def plot_total_memory(csv_file):
     plt.show()
 
 
-def plot_memory_data(csv_file):
+def plot_memory_data(csv_file, timestamp):
     df = pd.read_csv(csv_file)
     df = df.fillna(0)  # Fill any NA/NaN values with 0
     df.iloc[:, df.columns != "timestamp"].apply(pd.to_numeric).div(

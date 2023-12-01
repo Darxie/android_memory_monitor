@@ -1,14 +1,14 @@
 import csv
 import subprocess
-from datetime import datetime
 from pathlib import Path
 import logging
-import utils
+from utils import execute_adb_command, _write_to_file
+from timestamp import ExecutionTimestamp
 import plotter
 
-directory = Path("output")
-# Get the current timestamp in a specific format
-timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+timestamp = ExecutionTimestamp.get_timestamp()
+directory = Path(f"output/{timestamp}")
 
 # Construct filenames with the timestamp
 CSV_FILE = directory / f"memory_usage_{timestamp}.csv"
@@ -52,21 +52,7 @@ class Writer:
 
     def plot_data_from_csv(self):
         logging.info("\nPlotting memory data from CSV file...")
-        plotter.plot_memory_data(CSV_FILE)
-
-    @staticmethod
-    def _write_to_file(filename, content):
-        """
-        Append content to a file.
-
-        :param filename: Name of the file.
-        :param content: Content to append.
-        """
-        try:
-            with open(filename, "a", encoding="utf-8") as f:
-                f.write(content)
-        except Exception as e:
-            logging.error(f"Error writing to file {filename}: {e}")
+        plotter.plot_memory_data(CSV_FILE, timestamp)
 
     def _app_crashed(self, logcat_output, package_name):
         """
@@ -85,20 +71,20 @@ class Writer:
         return False
 
     def capture_sygic_log(self, package_name):
-        logcat_output = utils.execute_adb_command(["adb", "logcat", "-d"])
+        logcat_output = execute_adb_command(["adb", "logcat", "-d"])
 
         if self._app_crashed(logcat_output, package_name):
             logging.warning("The app seems to have crashed. Capturing full logs.")
-            self._write_to_file(CRASH_LOG_FILE, logcat_output)
+            _write_to_file(CRASH_LOG_FILE, logcat_output)
             logging.info("crash check returned true - app crashed")
             return True
         else:
             sygic_logs = "\n".join(
-                utils.execute_adb_command(
+                execute_adb_command(
                     ["adb", "logcat", "-d", "-s", "SYGIC"]
                 ).splitlines()[1:]
             )
-            self._write_to_file(LOGCAT_FILE, sygic_logs + "\n")
+            _write_to_file(LOGCAT_FILE, sygic_logs + "\n")
             subprocess.run(["adb", "logcat", "-c"])
             logging.info(f"Logs with tag 'SYGIC' have been saved to {LOGCAT_FILE}")
             logging.info("crash check returned false")

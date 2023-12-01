@@ -13,11 +13,28 @@ def on_button_click(use_case):
 
 # Initialize main window
 root = tk.Tk()
+
+# Window dimensions
+window_width = 400
+window_height = 220
+
+# Get screen dimensions
+screen_width = root.winfo_screenwidth()
+screen_height = root.winfo_screenheight()
+
+# Calculate x and y coordinates
+x = int((screen_width / 2) - (window_width / 2))
+y = int((screen_height / 2) - (window_height / 2))
+
+root.geometry(f"{window_width}x{window_height}+{x}+{y}")
 root.title("Automated Memory Monitor")
 
 # Styling for the buttons
 style = ttk.Style()
 style.configure("TButton", font=("Helvetica", 12), padding=10)
+
+title_label = ttk.Label(root, text="Choose Your Fighter", font=("Helvetica", 16))
+title_label.pack(pady=10)  # Add some padding for better spacing
 
 # Create a frame for the top row of buttons
 top_frame = ttk.Frame(root)
