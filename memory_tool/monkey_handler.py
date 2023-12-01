@@ -3,10 +3,10 @@ import utils
 import logging
 import threading
 import uiautomator2 as u2
-import use_case_demonstrate
-import use_case_compute
-import use_case_fg_bg
-import use_case_search
+import use_cases.use_case_demonstrate as demon
+import use_cases.use_case_compute as compute
+import use_cases.use_case_fg_bg as fg_bg
+import use_cases.use_case_search as search
 
 from timestamp import ExecutionTimestamp
 from writer import Writer
@@ -17,6 +17,7 @@ from memory_monitor import MemoryTool
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
 )
+
 
 def initialize_device(package_name):
     """
@@ -78,13 +79,13 @@ def run_automation_tasks(package_name, use_case):
     # User Interaction Event
     try:
         if use_case == "search":
-            use_case_search.simulate_user_interactions(device, memory_tool)
+            search.simulate_user_interactions(device, memory_tool)
         elif use_case == "demonstrate":
-            use_case_demonstrate.simulate_user_interactions(device, memory_tool)
+            demon.simulate_user_interactions(device, memory_tool)
         elif use_case == "compute":
-            use_case_compute.simulate_user_interactions(device, memory_tool)
+            compute.simulate_user_interactions(device, memory_tool)
         elif use_case == "fg_bg":
-            use_case_fg_bg.simulate_user_interactions(memory_tool)
+            fg_bg.simulate_user_interactions(memory_tool)
     except Exception:
         logging.warn("Exception in automation, stopping monitoring")
         memory_tool.stop_monitoring()
