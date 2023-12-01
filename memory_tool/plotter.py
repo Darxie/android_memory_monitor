@@ -10,7 +10,7 @@ from timestamp import ExecutionTimestamp
 timestamp = ExecutionTimestamp.get_timestamp()
 directory = Path(f"output/{timestamp}")
 
-IMAGE = directory / f"memory_stacked_line_chart_{timestamp}.png"
+IMAGE_STACKED_MEMORY = directory / f"memory_stacked_line_chart_{timestamp}.png"
 IMAGE_TOTAL_MEMORY = directory / f"memory_total_{timestamp}.png"
 
 
@@ -46,8 +46,15 @@ def plot_total_memory(csv_file):
     plt.show()
 
 
-def plot_memory_data(csv_file, timestamp):
+def plot_memory_data(csv_file):
     df = pd.read_csv(csv_file)
+
+    if len(df) < 2:
+        logging.error(
+            "The data output is not suitable for plotting as it contains less than 2 points"
+        )
+        exit(1)
+
     df = df.fillna(0)  # Fill any NA/NaN values with 0
     df.iloc[:, df.columns != "timestamp"].apply(pd.to_numeric).div(
         1024
@@ -71,7 +78,7 @@ def plot_memory_data(csv_file, timestamp):
     plt.ylabel("Memory Usage (MB)")
     plt.tight_layout()
     plt.xticks(rotation=45)
-    plt.savefig(IMAGE)
+    plt.savefig(IMAGE_STACKED_MEMORY)
     logging.info("\nPlotting stacked memory data plot completed.\n\n")
     plt.show()
 
