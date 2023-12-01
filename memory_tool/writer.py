@@ -18,6 +18,7 @@ CRASH_LOG_FILE = directory / f"crash_log_{timestamp}.txt"
 FATAL_EXCEPTION_LOOKAHEAD = (
     10  # Number of lines to look ahead for package name after a FATAL EXCEPTION
 )
+ERROR_SIGNALS = ["FATAL EXCEPTION", "Fatal signal"]
 
 
 class Writer:
@@ -76,8 +77,8 @@ class Writer:
         :return: True if crash detected, False otherwise.
         """
         lines = logcat_output.splitlines()
-        for i in range(len(lines)):
-            if "FATAL EXCEPTION" in lines[i]:
+        for i, line in enumerate(lines):
+            if any(error_signal in line for error_signal in ERROR_SIGNALS):
                 for j in range(i, min(i + FATAL_EXCEPTION_LOOKAHEAD, len(lines))):
                     if package_name in lines[j]:
                         return True
@@ -89,8 +90,8 @@ class Writer:
         if self._app_crashed(logcat_output, package_name):
             logging.warning("The app seems to have crashed. Capturing full logs.")
             self._write_to_file(CRASH_LOG_FILE, logcat_output)
-            self.plot_data_from_csv()
-            exit(0)
+            logging.info("crash check returned true - app crashed")
+            return True
         else:
             sygic_logs = "\n".join(
                 utils.execute_adb_command(
@@ -100,3 +101,5 @@ class Writer:
             self._write_to_file(LOGCAT_FILE, sygic_logs + "\n")
             subprocess.run(["adb", "logcat", "-c"])
             logging.info(f"Logs with tag 'SYGIC' have been saved to {LOGCAT_FILE}")
+            logging.info("crash check returned false")
+            return False

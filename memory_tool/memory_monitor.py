@@ -16,7 +16,9 @@ class MemoryTool:
     elapsed_time = 0
     check_interval = 5
 
-    def __init__(self, writer, package_name, monitoring_finished_event=None):
+    def __init__(
+        self, writer, package_name, monitoring_finished_event=None
+    ):
         self.writer = writer
         self.package_name = package_name
         self.monitoring_finished_event = monitoring_finished_event
@@ -47,11 +49,12 @@ class MemoryTool:
         return "NA"
 
     def check_for_crashes(self):
-        self.writer.capture_sygic_log(self.package_name)
+        # capture_sygic_log returns True if app crashed
+        return self.writer.capture_sygic_log(self.package_name)
 
     def process_meminfo(self):
         """
-        Extracts memory information using adb shell dumpsys meminfo command 
+        Extracts memory information using adb shell dumpsys meminfo command
         and writes it to a file.
         """
         timestamp = int(time.time())
@@ -86,7 +89,8 @@ class MemoryTool:
                         f" Monitoring in progress... (Total Memory: {self.last_total_memory/1024}MB)"
                     )
 
-                self.check_for_crashes()  # ToDo SDC-10346
+                if self.check_for_crashes():
+                    self.stop_monitoring()
                 time.sleep(self.check_interval)
                 self.elapsed_time += self.check_interval
 

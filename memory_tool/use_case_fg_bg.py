@@ -4,7 +4,8 @@ import logging
 
 
 def simulate_user_interactions(memory_tool):
-    for i in range(1, 50):
+    for i in range(0, 100):
+        logging.info(f"Mambo number {i+1}")
         time.sleep(25)
         utils.execute_adb_command(
             [

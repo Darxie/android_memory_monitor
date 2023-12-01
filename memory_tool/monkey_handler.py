@@ -24,6 +24,7 @@ def initialize_device(package_name):
 
     device_id = utils.get_device_id()
     device = u2.connect(device_id)
+    device.app_stop(package_name) # force close app if running
     logging.info(f"Connected to device: \n{device_id}  \n{device.info}")
     device.screen_on()
     utils.execute_adb_command(
@@ -46,7 +47,7 @@ def initialize_device(package_name):
     return device
 
 
-def run_automation_tasks(package_name):
+def run_automation_tasks(package_name, use_case):
     """
     Runs automation tasks for the given package name.
 
@@ -70,8 +71,19 @@ def run_automation_tasks(package_name):
     utils.print_app_info(device, package_name)
 
     # User Interaction Event
-    use_case_search.simulate_user_interactions(device, memory_tool)
-    logging.info("Automation tasks completed, monitoring still running")
+    try:
+        if use_case == "search":
+            use_case_search.simulate_user_interactions(device, memory_tool)
+        elif use_case == "demonstrate":
+            use_case_demonstrate.simulate_user_interactions(device, memory_tool)
+        elif use_case == "compute":
+            use_case_compute.simulate_user_interactions(device, memory_tool)
+        elif use_case == "fg_bg":
+            use_case_fg_bg.simulate_user_interactions(memory_tool)
+    except Exception:
+        logging.warn("Exception in automation, stopping monitoring")
+        memory_tool.stop_monitoring()
+
     monitoring_finished_event.wait()
 
     writer.plot_data_from_csv()
@@ -79,4 +91,4 @@ def run_automation_tasks(package_name):
 
 if __name__ == "__main__":
     package_name = "com.sygic.profi.beta"
-    run_automation_tasks(package_name)
+    run_automation_tasks(package_name, "search")

@@ -1,12 +1,18 @@
 import time
+import logging
 
+
+"""
+NECESSARY MAPS - Slovakia, South Carolina, Singapore
+"""
 
 # crashes spontaneously
 def simulate_user_interactions(device, memory_tool):
     """
     Simulate user interactions on the device.
     """
-    for i in range(1, 50):
+    for i in range(0, 50):
+        logging.info(f"Mambo number {i+1}")
         time.sleep(1)
         tap_search_bar(device)
         time.sleep(1)
@@ -43,6 +49,7 @@ def tap_search_bar(device):
 
 def set_search_text(device, input_text):
     device(resourceId="com.sygic.profi.beta:id/inputField").set_text(input_text)
+
 
 def select_first_result(device):
     device.xpath(

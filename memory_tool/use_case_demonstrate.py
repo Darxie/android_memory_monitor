@@ -1,5 +1,8 @@
 import time
 
+"""
+NECESSARY MAPS - Slovakia, Austria, Italy
+"""
 
 def simulate_user_interactions(device, memory_tool):
     """
@@ -9,7 +12,9 @@ def simulate_user_interactions(device, memory_tool):
     time.sleep(2)
     tap_search_bar(device)
     time.sleep(2)
-    device(resourceId="com.sygic.profi.beta:id/inputField").set_text("Lagerhaus Tamsweg")
+    device(resourceId="com.sygic.profi.beta:id/inputField").set_text(
+        "Lagerhaus Tamsweg"
+    )
     time.sleep(2)
     device.xpath(
         '//*[@resource-id="com.sygic.profi.beta:id/recyclerView"]/android.view.ViewGroup[1]/android.widget.TextView[1]'
@@ -29,8 +34,6 @@ def simulate_user_interactions(device, memory_tool):
     )
     device.watcher.start()
 
-
-import time
 
 def stop_demonstrate(device, memory_tool):
     """

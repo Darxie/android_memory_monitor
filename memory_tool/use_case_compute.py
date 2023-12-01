@@ -1,11 +1,18 @@
 import time
+import logging
+
+
+"""
+NECESSARY MAPS - Slovakia, Austria
+"""
 
 
 def simulate_user_interactions(device, memory_tool):
     """
     Simulate user interactions on the device.
     """
-    for i in range(1, 50):
+    for i in range(0, 100):
+        logging.info(f"Mambo number {i+1}")
         time.sleep(2)
         tap_search_bar(device)
         time.sleep(2)
