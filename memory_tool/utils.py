@@ -93,12 +93,13 @@ def print_info(package_name):
     logging.info("Printing device information completed.\n\n")
 
 
-def print_app_info(device, package_name):
+def print_app_info(device, package_name, use_case):
     app_info = device.app_info(package_name)
     logging.info(app_info)
 
-    _write_to_file(INFO_FILE, str(device.info))
-    _write_to_file(INFO_FILE, str(app_info))
+    _write_to_file(INFO_FILE, f"Use case: {use_case}\n")
+    _write_to_file(INFO_FILE, f"Device Info: \n{device.info}\n")
+    _write_to_file(INFO_FILE, f"Application Info: \n{app_info}\n")
 
 
 def _write_to_file(filename, content):

@@ -52,7 +52,7 @@ class Writer:
 
     def plot_data_from_csv(self):
         logging.info("\nPlotting memory data from CSV file...")
-        plotter.plot_memory_data(CSV_FILE, timestamp)
+        plotter.plot_memory_data(CSV_FILE)
 
     def _app_crashed(self, logcat_output, package_name):
         """
