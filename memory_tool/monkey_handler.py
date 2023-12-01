@@ -74,7 +74,7 @@ def run_automation_tasks(package_name, use_case):
     memory_tool = MemoryTool(writer, package_name, monitoring_finished_event)
     threading.Thread(target=memory_tool.start_monitoring).start()
 
-    utils.print_app_info(device, package_name)
+    utils.print_app_info(device, package_name, use_case)
 
     # User Interaction Event
     try:

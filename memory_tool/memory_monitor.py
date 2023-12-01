@@ -9,12 +9,12 @@ class MemoryTool:
 
     """
 
-    is_monitoring = True
-    LOG_INTERVAL = 60  # 30 seconds
+    is_monitoring = False
+    LOG_INTERVAL = 30  # in seconds
     last_total_memory = 0
     last_timestamp = 0
     elapsed_time = 0
-    check_interval = 5
+    check_interval = 5 # in seconds
 
     def __init__(
         self, writer, package_name, monitoring_finished_event=None
@@ -80,7 +80,7 @@ class MemoryTool:
         Starts monitoring the memory usage of the specified package.
         """
         utils.print_info(self.package_name)
-
+        self.is_monitoring = True
         try:
             while self.is_monitoring:
                 if self.elapsed_time % self.LOG_INTERVAL == 0:
