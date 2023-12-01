@@ -7,16 +7,16 @@ import use_case_demonstrate
 import use_case_compute
 import use_case_fg_bg
 import use_case_search
-from timestamp import ExecutionTimestamp
 
+from timestamp import ExecutionTimestamp
 from writer import Writer
 from memory_monitor import MemoryTool
+
 
 # Set up logging configuration
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
 )
-
 
 def initialize_device(package_name):
     """
