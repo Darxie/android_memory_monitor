@@ -79,7 +79,6 @@ class MemoryTool:
         """
         Starts monitoring the memory usage of the specified package.
         """
-        utils.print_info(self.package_name)
         self.is_monitoring = True
         try:
             while self.is_monitoring:

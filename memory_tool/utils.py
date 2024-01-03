@@ -9,6 +9,7 @@ directory = Path(f"output/{timestamp}")
 
 # Construct filenames with the timestamp
 INFO_FILE = directory / f"app_info.txt"
+JPEG_FILE = directory / f"app-about.jpg"
 
 
 def execute_adb_command(command_list) -> str:
@@ -73,32 +74,20 @@ def get_device_id() -> str:
     exit(1)
 
 
-def print_info(package_name):
-    """
-    Print device information including process ID and device ID.
-
-    :param package_name: Name of the app package.
-    """
-    pid = get_app_pid(package_name)
-    device_id = get_device_id()
-
-    if pid:
-        logging.info(f"Process ID: {pid}")
-    else:
-        logging.warning(f"Could not get PID for {package_name}")
-
-    if device_id:
-        logging.info(f"Device ID: {device_id}")
-
-    logging.info("Printing device information completed.\n\n")
-
-
 def print_app_info(device, package_name, use_case):
     app_info = device.app_info(package_name)
+    device_id = get_device_id()
+    pid = get_app_pid(package_name)
+
     logging.info(app_info)
+    logging.info(f"Process ID: {pid}")
+    logging.info(f"Device ID: {device_id}")
+
+    take_info_about_screenshot(device)
 
     _write_to_file(INFO_FILE, f"Use case: {use_case}\n")
     _write_to_file(INFO_FILE, f"Device Info: \n{device.info}\n")
+    _write_to_file(INFO_FILE, f"Device Code: {device_id}\n")
     _write_to_file(INFO_FILE, f"Application Info: \n{app_info}\n")
 
 
@@ -114,3 +103,37 @@ def _write_to_file(filename, content):
             f.write(content)
     except Exception as e:
         logging.error(f"Error writing to file {filename}: {e}")
+
+
+def take_info_about_screenshot(device):
+    # Menu - Settings - Info - About
+    device.xpath(
+        '//*[@resource-id="com.sygic.profi.beta:id/composeView_searchBar"]/android.view.View[1]/android.view.View[2]'
+    ).click()
+    device.xpath(
+        "//androidx.compose.ui.platform.ComposeView/android.view.View[1]/android.view.View[6]"
+    ).click()
+    device.xpath(
+        "//androidx.compose.ui.platform.ComposeView/android.view.View[1]/android.view.View[2]/android.view.View[5]"
+    ).click()
+    device.xpath(
+        "//androidx.compose.ui.platform.ComposeView/android.view.View[1]/android.view.View[2]/android.view.View[1]"
+    ).click()
+    device.xpath(
+        "//androidx.compose.ui.platform.ComposeView/android.view.View[1]/android.view.View[2]/android.view.View[1]"
+    ).click()
+    # Take screenshot
+    device.screenshot(JPEG_FILE)
+    # Get back to map
+    device.xpath(
+        "//androidx.compose.ui.platform.ComposeView/android.view.View[1]/android.view.View[1]"
+    ).click()
+    device.xpath(
+        "//androidx.compose.ui.platform.ComposeView/android.view.View[1]/android.view.View[1]"
+    ).click()
+    device.xpath(
+        "//androidx.compose.ui.platform.ComposeView/android.view.View[1]/android.view.View[1]"
+    ).click()
+    device.xpath(
+        "//androidx.compose.ui.platform.ComposeView/android.view.View[1]/android.view.View[1]"
+    ).click()
