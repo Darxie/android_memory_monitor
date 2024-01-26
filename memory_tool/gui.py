@@ -16,7 +16,7 @@ root = tk.Tk()
 
 # Window dimensions
 window_width = 400
-window_height = 220
+window_height = 260
 
 # Get screen dimensions
 screen_width = root.winfo_screenwidth()
@@ -40,12 +40,15 @@ title_label.pack(pady=10)  # Add some padding for better spacing
 top_frame = ttk.Frame(root)
 top_frame.pack(pady=10)
 
+middle_frame = ttk.Frame(root)
+middle_frame.pack(pady=10)
+
 # Create a frame for the bottom row of buttons
 bottom_frame = ttk.Frame(root)
 bottom_frame.pack(pady=10)
 
 # Buttons
-button_names = ["search", "demonstrate", "compute", "fg_bg"]
+button_names = ["search", "demonstrate", "compute", "fg_bg", "zoom"]
 buttons = []
 
 # Top row buttons
@@ -57,9 +60,19 @@ for name in button_names[:2]:
     buttons.append(button)
 
 # Bottom row buttons
-for name in button_names[2:]:
+for name in button_names[2:3]:
     button = ttk.Button(
         bottom_frame,
+        text=name,
+        command=lambda n=name: on_button_click(n),
+        style="TButton",
+    )
+    button.pack(side=tk.LEFT, padx=10)
+    buttons.append(button)
+
+for name in button_names[3:]:
+    button = ttk.Button(
+        middle_frame,
         text=name,
         command=lambda n=name: on_button_click(n),
         style="TButton",

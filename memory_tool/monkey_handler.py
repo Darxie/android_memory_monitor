@@ -7,6 +7,7 @@ import use_cases.use_case_demonstrate as demon
 import use_cases.use_case_compute as compute
 import use_cases.use_case_fg_bg as fg_bg
 import use_cases.use_case_search as search
+import use_cases.use_case_zoom as zoom
 
 from timestamp import ExecutionTimestamp
 from writer import Writer
@@ -86,6 +87,8 @@ def run_automation_tasks(package_name, use_case):
             compute.simulate_user_interactions(device, memory_tool)
         elif use_case == "fg_bg":
             fg_bg.simulate_user_interactions(memory_tool)
+        elif use_case == "zoom":
+            zoom.simulate_user_interactions(device, memory_tool)
     except Exception:
         logging.warn("Exception in automation, stopping monitoring")
         memory_tool.stop_monitoring()
