@@ -18,10 +18,10 @@ def simulate_user_interactions(device, memory_tool):
     for i in range(0, 100):
         logging.info(f"Mambo number {i+1}")
 
-        for zoom_out in range(0, 20):
+        for _zoom_out in range(0, 20):
             device.click(976, 1392)
 
-        for zoom_in in range(0, 20):
+        for _zoom_in in range(0, 20):
             device.click(976, 1053)
 
     memory_tool.stop_monitoring()
