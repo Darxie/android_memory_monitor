@@ -1,4 +1,5 @@
 import time
+import logging
 
 """
 NECESSARY MAPS - Slovakia, Austria, Italy
@@ -12,10 +13,10 @@ def simulate_user_interactions(device, memory_tool):
     time.sleep(2)
     tap_search_bar(device)
     time.sleep(2)
-    device(resourceId="com.sygic.profi.beta:id/inputField").set_text(
-        "Lagerhaus Tamsweg"
+    device(focused=True).set_text(
+        "omv laggen krems"
     )
-    time.sleep(2)
+    time.sleep(4)
     device.xpath(
         '//*[@resource-id="com.sygic.profi.beta:id/recyclerView"]/android.view.ViewGroup[1]/android.widget.TextView[1]'
     ).click()
@@ -29,9 +30,13 @@ def simulate_user_interactions(device, memory_tool):
     time.sleep(1)
     device(text="Demonstrate route").click()
 
-    device.watcher("FinishWatcher").when("Finish").call(
+    time.sleep(3)
+
+    logging.info("adding watcher")
+    device.watcher("FinishWatcher").when("OMV, Laggen 18, Krems").call(
         lambda: stop_demonstrate(device, memory_tool)
     )
+    logging.info("starting watcher")
     device.watcher.start()
 
 
@@ -47,15 +52,10 @@ def stop_demonstrate(device, memory_tool):
     Returns:
         None
     """
-    device.xpath(
-        '//*[@resource-id="com.sygic.profi.beta:id/mapInfoAnimator"]/android.widget.LinearLayout[1]/android.widget.ImageView[2]'
-    ).click()  # press stop
     device(resourceId="com.sygic.profi.beta:id/remainingTime").click()  # swipe up
     time.sleep(1)
-    device(
-        resourceId="com.sygic.profi.beta:id/infoBarMenuActionsButton",
-        text="Cancel route",
-    ).click()  # cancel route
+    device.xpath('//*[@text="Cancel route"]').click()  # cancel route
+    logging.info("canceled route")
     time.sleep(5)
     memory_tool.stop_monitoring()
 

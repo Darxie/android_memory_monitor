@@ -16,7 +16,8 @@ from memory_monitor import MemoryTool
 
 # Set up logging configuration
 logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
+    level=logging.DEBUG, format="%(asctime)s - %(levelname)s - %(message)s",
+    handlers=[logging.FileHandler("my_app.log"), logging.StreamHandler()]
 )
 
 
