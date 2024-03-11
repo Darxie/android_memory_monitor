@@ -2,7 +2,7 @@ import time
 import logging
 
 """
-NECESSARY MAPS - Slovakia, Austria, Italy
+NECESSARY MAPS - Slovakia, Austria, Germany
 """
 
 def simulate_user_interactions(device, memory_tool):
@@ -14,7 +14,7 @@ def simulate_user_interactions(device, memory_tool):
     tap_search_bar(device)
     time.sleep(2)
     device(focused=True).set_text(
-        "omv laggen krems"
+        "burgerhaus zeughaustrasse philippsburg"
     )
     time.sleep(4)
     device.xpath(
@@ -33,9 +33,9 @@ def simulate_user_interactions(device, memory_tool):
     time.sleep(3)
 
     logging.info("adding watcher")
-    device.watcher("FinishWatcher").when("OMV, Laggen 18, Krems").call(
-        lambda: stop_demonstrate(device, memory_tool)
-    )
+    device.watcher("FinishWatcher").when(
+        "Bürgerhaus, Zeughausstraße, Philippsburg"
+    ).call(lambda: stop_demonstrate(device, memory_tool))
     logging.info("starting watcher")
     device.watcher.start()
 

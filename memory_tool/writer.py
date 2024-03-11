@@ -86,6 +86,6 @@ class Writer:
             )
             _write_to_file(LOGCAT_FILE, sygic_logs + "\n")
             subprocess.run(["adb", "logcat", "-c"])
-            logging.info(f"Logs with tag 'SYGIC' have been saved to {LOGCAT_FILE}")
-            logging.info("crash check returned false")
+            #logging.info(f"Logs with tag 'SYGIC' have been saved to {LOGCAT_FILE}")
+            #logging.info("crash check returned false")
             return False
