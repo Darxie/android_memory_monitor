@@ -1,6 +1,0 @@
-Use case: demonstrate
-Device Info: 
-{'currentPackageName': 'com.sygic.profi.beta', 'displayHeight': 2209, 'displayRotation': 0, 'displaySizeDpX': 411, 'displaySizeDpY': 914, 'displayWidth': 1080, 'productName': 'oriole_beta', 'screenOn': True, 'sdkInt': 34, 'naturalOrientation': True}
-Device Code: 21241FDF6004E4
-Application Info: 
-{'packageName': 'com.sygic.profi.beta', 'mainActivity': 'com.sygic.profi.platform.splashscreen.feature.ui.main.SplashScreenActivity', 'label': 'Sygic Truck', 'versionName': '28.4.0-SNAPSHOT-dirty', 'versionCode': 29040000, 'size': 47971079}
