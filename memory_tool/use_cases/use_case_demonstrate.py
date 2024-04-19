@@ -1,14 +1,41 @@
 import time
 import logging
+import threading
 
 """
 NECESSARY MAPS - Slovakia, Austria, Germany
 """
 
+
+def add_watcher(device, memory_tool, stop_event):
+    logging.info("Removing watchers")
+    device.watcher.remove("FinishWatcher")  # Remove the existing watcher if any
+    logging.info("Adding watcher")
+    device.watcher("FinishWatcher").when(
+        "Bürgerhaus, Zeughausstraße, Philippsburg"
+    ).call(lambda: stop_demonstrate(device, memory_tool, stop_event))
+    device.watcher.start()
+
+
+def watcher_refresh_loop(device, memory_tool, stop_event):
+    if not device.uiautomator.running():
+        device.uiautomator.start()
+    while not stop_event.is_set():
+        add_watcher(device, memory_tool, stop_event)
+        time.sleep(1800)  # Wait for 30 min before refreshing the watcher
+
+
 def simulate_user_interactions(device, memory_tool):
     """
     Simulate user interactions on the device.
     """
+
+    stop_event = threading.Event()
+    # Set a timer to automatically stop the demonstration after 12 hours
+    stop_timer = threading.Timer(
+        43200, stop_demonstrate, args=(device, memory_tool, stop_event)
+    )
+    stop_timer.start()  # Start the timer
 
     time.sleep(2)
     tap_search_bar(device)
@@ -32,15 +59,10 @@ def simulate_user_interactions(device, memory_tool):
 
     time.sleep(3)
 
-    logging.info("adding watcher")
-    device.watcher("FinishWatcher").when(
-        "Bürgerhaus, Zeughausstraße, Philippsburg"
-    ).call(lambda: stop_demonstrate(device, memory_tool))
-    logging.info("starting watcher")
-    device.watcher.start()
+    threading.Thread(target=watcher_refresh_loop, args=(device, memory_tool, stop_event), daemon=True).start()
 
 
-def stop_demonstrate(device, memory_tool):
+def stop_demonstrate(device, memory_tool, stop_event):
     """
     Stops the demonstration by clicking the stop button, swiping up, and cancelling the route.
     Also stops the memory monitoring.
@@ -52,6 +74,7 @@ def stop_demonstrate(device, memory_tool):
     Returns:
         None
     """
+    stop_event.set()
     device(resourceId="com.sygic.profi.beta:id/remainingTime").click()  # swipe up
     time.sleep(1)
     device.xpath('//*[@text="Cancel route"]').click()  # cancel route

@@ -21,15 +21,13 @@ logging.basicConfig(
 )
 
 
-def initialize_device(package_name):
+def initialize_device(package_name, device_code):
     """
     Initialize connection to the Android device and launch the application.
     """
-
-    device_id = utils.get_device_id()
-    device = u2.connect(device_id)
+    device = u2.connect(device_code)
     device.app_stop(package_name)  # force close app if running
-    logging.info(f"Connected to device: \n{device_id}  \n{device.info}")
+    logging.info(f"Connected to device: \n{device_code}  \n{device.info}")
     device.screen_on()
     utils.execute_adb_command(
         [
@@ -51,7 +49,7 @@ def initialize_device(package_name):
     return device
 
 
-def run_automation_tasks(package_name, use_case):
+def run_automation_tasks(package_name, use_case, device_code):
     """
     Runs automation tasks for the given package name.
 
@@ -65,7 +63,7 @@ def run_automation_tasks(package_name, use_case):
     # initialize timestamp
     ExecutionTimestamp.get_timestamp()
 
-    device = initialize_device(package_name)
+    device = initialize_device(package_name, device_code)
 
     # Set up synchronization event
     monitoring_finished_event = threading.Event()
@@ -97,8 +95,4 @@ def run_automation_tasks(package_name, use_case):
     monitoring_finished_event.wait()
 
     writer.plot_data_from_csv()
-
-
-if __name__ == "__main__":
-    package_name = "com.sygic.profi.beta"
-    run_automation_tasks(package_name, "search")
+    device.app_stop(package_name)
