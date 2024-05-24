@@ -57,7 +57,7 @@ style.configure("TLabel", font=("Helvetica", 14))
 style.configure("TCombobox", font=("Helvetica", 12), padding=10)
 
 # Adjusted window dimensions to accommodate all elements
-window_width = 800  # Increased width
+window_width = 1000
 window_height = 300
 screen_width = root.winfo_screenwidth()
 screen_height = root.winfo_screenheight()
@@ -100,7 +100,7 @@ task_frame = ttk.Frame(root)
 task_frame.pack(pady=20)
 
 # Organizing buttons with better spacing
-task_options = ["search", "demonstrate", "compute", "fg_bg", "zoom"]
+task_options = ["search", "demonstrate", "compute", "fg_bg", "zoom", "freedrive"]
 for task in task_options:
     button = ttk.Button(
         task_frame,
