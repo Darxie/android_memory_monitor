@@ -56,5 +56,5 @@ def select_first_result(device):
 
 def tap_x_button(device):
     device.xpath(
-        '//*[@resource-id="com.sygic.profi.beta:id/compose_searchBar"]/android.view.View[1]/android.view.View[1]/android.view.View[2]'
+        '//*[@resource-id="com.sygic.profi.beta:id/topPanel"]/android.view.View[1]/android.view.View[1]/android.view.View[2]'
     ).click()
