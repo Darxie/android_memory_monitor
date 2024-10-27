@@ -16,13 +16,13 @@ IMAGE_TOTAL_MEMORY = directory / f"memory_total_{timestamp}.png"
 
 def plot_total_memory(csv_file):
     df = pd.read_csv(csv_file)
-    df = df.fillna(0)  # Fill any NA/NaN values with 0
-    df.iloc[:, df.columns != "timestamp"].apply(pd.to_numeric).div(
-        1024
-    )  # convert to MB
+    df.fillna(0, inplace=True) # Fill any NA/NaN values with 0
+    
+    numeric_columns = df.columns.difference(["timestamp"])
+    df[numeric_columns] = df[numeric_columns].apply(pd.to_numeric).div(1024)
 
-    # Check if any value in total_memory exceeds 1000 MB (1 GB)
-    if df["total_memory"].max() > 1000:
+    # Check if any value in total_memory exceeds 1024 MB (1 GB)
+    if df["total_memory"].max() > 1024:
         df["total_memory"] = df["total_memory"].div(1024)  # convert to GB
         memory_unit = "GB"
     else:
@@ -55,10 +55,19 @@ def plot_memory_data(csv_file):
         )
         exit(1)
 
-    df = df.fillna(0)  # Fill any NA/NaN values with 0
-    df.iloc[:, df.columns != "timestamp"].apply(pd.to_numeric).div(
-        1024
-    )  # convert to MB
+    df.fillna(0, inplace=True) # Fill any NA/NaN values with 0
+
+    numeric_columns = df.columns.difference(["timestamp"])
+    df[numeric_columns] = df[numeric_columns].apply(pd.to_numeric).div(1024)
+
+    # Determine if any memory values exceed 1024 MB (indicating we should use GB)
+    exceeds_gb = df[numeric_columns].max().max() > 1024
+    if exceeds_gb:
+        df[numeric_columns] = df[numeric_columns].div(1024)  # Convert to GB
+        memory_unit = "GB"
+    else:
+        memory_unit = "MB"
+
     df["timestamp"] = pd.to_datetime(df["timestamp"], unit="s")
     df["timestamp"] = df["timestamp"].dt.strftime("%H:%M")
 
@@ -75,9 +84,13 @@ def plot_memory_data(csv_file):
     plt.legend(loc="upper left")
     plt.title("Memory Usage Over Time")
     plt.xlabel("Timestamp")
-    plt.ylabel("Memory Usage (MB)")
+    plt.ylabel(f"Memory Usage ({memory_unit})")
     plt.tight_layout()
     plt.xticks(rotation=45)
+
+    plt.gca().xaxis.set_major_formatter(mdates.DateFormatter("%H:%M"))
+    plt.gca().xaxis.set_major_locator(mdates.HourLocator())
+
     plt.savefig(IMAGE_STACKED_MEMORY)
     logging.info("\nPlotting stacked memory data plot completed.\n\n")
     plt.show()

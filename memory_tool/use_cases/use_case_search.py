@@ -13,7 +13,6 @@ def simulate_user_interactions(device, memory_tool):
     """
     for i in range(0, 50):
         logging.info(f"Mambo number {i+1}")
-        time.sleep(1)
         tap_search_bar(device)
         time.sleep(1)
         set_search_text(device, "market horlbeck")
@@ -21,13 +20,11 @@ def simulate_user_interactions(device, memory_tool):
         select_first_result(device)
         time.sleep(3)
         tap_x_button(device)
-        time.sleep(1)
         set_search_text(device, "kam kreta ayer")
         time.sleep(1)
         select_first_result(device)
         time.sleep(3)
         tap_x_button(device)
-        time.sleep(1)
         device.xpath('//*[@resource-id="com.sygic.profi.beta:id/navButton"]').click()
     memory_tool.stop_monitoring()
 
@@ -59,5 +56,5 @@ def select_first_result(device):
 
 def tap_x_button(device):
     device.xpath(
-        '//*[@resource-id="com.sygic.profi.beta:id/compose_searchBar"]/android.view.View[1]/android.view.View[1]/android.view.View[2]'
+        '//*[@resource-id="com.sygic.profi.beta:id/topPanel"]/android.view.View[1]/android.view.View[1]/android.view.View[2]'
     ).click()

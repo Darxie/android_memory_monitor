@@ -3,3 +3,5 @@ uiautomator2==2.16.25
 matplotlib==3.8.0
 seaborn==0.13.0
 pandas==2.1.1
+pyOpenSSL>=0.13
+ndg-httpsclient>=0.3.2
