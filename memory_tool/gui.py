@@ -100,7 +100,7 @@ task_frame = ttk.Frame(root)
 task_frame.pack(pady=20)
 
 # Organizing buttons with better spacing
-task_options = ["search", "demonstrate", "compute", "fg_bg", "zoom", "freedrive"]
+task_options = ["search", "demonstrate", "compute", "fg_bg", "zoom", "freedrive", "demon_fg_bg"]
 for task in task_options:
     button = ttk.Button(
         task_frame,
