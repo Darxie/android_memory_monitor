@@ -11,7 +11,7 @@ def simulate_user_interactions(device, memory_tool):
     Simulate user interactions on the device.
     """
     zoom_to_nepal(device)
-    device.xpath('//*[@resource-id="com.sygic.profi.beta:id/zoomButtons"]').click()
+    device.xpath('//*[@resource-id="com.sygic.profi.beta:id/zoomControls"]').click()
 
     for i in range(0, 100):
         logging.info(f"Mambo number {i+1}")

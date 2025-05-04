@@ -23,7 +23,8 @@ class MemoryTool:
         self.package_name = package_name
         self.monitoring_finished_event = monitoring_finished_event
 
-    def extract_memory_info(self, label, data) -> str:
+    @staticmethod
+    def extract_memory_info(label, data) -> str:
         """
         Extracts memory information from the given data based on the provided label.
 

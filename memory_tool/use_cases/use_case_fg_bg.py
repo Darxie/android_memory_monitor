@@ -26,7 +26,7 @@ def simulate_user_interactions(memory_tool):
                 "am",
                 "start",
                 "-n",
-                "com.sygic.profi.beta/com.sygic.aura.activity.NaviNativeActivity",
+                "com.sygic.profi.beta/com.sygic.profi.platform.splashscreen.feature.ui.main.SplashScreenActivity",
             ]
         )
         logging.info("switched to profi navi")

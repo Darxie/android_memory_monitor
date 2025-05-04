@@ -31,6 +31,7 @@ def initialize_device(package_name, device_code):
     device.app_stop(package_name)  # force close app if running
     logging.info(f"Connected to device: \n{device_code}  \n{device.info}")
     device.screen_on()
+    # device.app_start(package_name)
     utils.execute_adb_command(
         [
             "adb",
@@ -42,12 +43,6 @@ def initialize_device(package_name, device_code):
         ]
     )
     utils.execute_adb_command(["adb", "logcat", "-c"])
-    if device.app_wait(package_name, front=True):
-        pass
-    else:
-        logging.error(f"App {package_name} failed to start!")
-        sys.exit(1)
-
     return device
 
 
@@ -57,6 +52,8 @@ def run_automation_tasks(package_name, use_case, device_code):
 
     Args:
         package_name (str): The name of the package to run automation tasks for.
+        use_case (str): use case shortened name
+        device_code (str): unique device code
 
     Returns:
         None
@@ -95,7 +92,7 @@ def run_automation_tasks(package_name, use_case, device_code):
         elif use_case == "demon_fg_bg":
             demon_fg_bg.simulate_user_interactions(device, memory_tool)
     except Exception:
-        logging.warn("Exception in automation, stopping monitoring")
+        logging.warning("Exception in automation, stopping monitoring")
         memory_tool.stop_monitoring()
 
     monitoring_finished_event.wait()

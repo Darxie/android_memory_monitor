@@ -5,12 +5,12 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Python: Current File",
+      "name": "Run GUI",
       "type": "debugpy",
       "request": "launch",
-      "program": "${file}",
+      "module": "memory_tool.gui",
       "console": "integratedTerminal",
-      "justMyCode": true
+      "envFile": "${workspaceFolder}/.env"
     }
   ]
 }
