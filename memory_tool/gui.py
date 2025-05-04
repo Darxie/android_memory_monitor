@@ -59,7 +59,7 @@ style.configure("TLabel", font=("Helvetica", 14))
 style.configure("TCombobox", font=("Helvetica", 12), padding=10)
 
 # Adjusted window dimensions to accommodate all elements
-window_width = 1000
+window_width = 1100
 window_height = 300
 screen_width = root.winfo_screenwidth()
 screen_height = root.winfo_screenheight()
