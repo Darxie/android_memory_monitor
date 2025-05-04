@@ -1,6 +1,8 @@
 import tkinter as tk
 from tkinter import ttk
 import monkey_handler
+from typing import List, Tuple
+
 import re
 import subprocess
 
@@ -27,11 +29,11 @@ def get_connected_devices():
     # Use 'adb devices -l' to get more details about connected devices
     result = subprocess.check_output(["adb", "devices", "-l"])
     lines = result.splitlines()
-    devices = []
+    devices: List[Tuple[str, str]] = []
     for line in lines[1:]:  # Skip the first line which is a header
         line_str = line.decode("utf-8")
         # Use regex to find the model name, including models with spaces
-        match = re.search(r"model:([^\s]+)", line_str)
+        match = re.search(r"model:(\S+)", line_str)
         if match:
             model = match.group(1)
             # Replace underscores with spaces to handle models with spaces properly
@@ -105,7 +107,7 @@ for task in task_options:
     button = ttk.Button(
         task_frame,
         text=task,
-        command=lambda task=task: on_selection_made("task", task),
+        command=lambda button_task=task: on_selection_made("task", button_task),
         style="TButton",
     )
     # This arrangement will ensure all buttons are visible and well spaced
