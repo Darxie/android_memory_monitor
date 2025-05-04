@@ -16,17 +16,23 @@ IMAGE_TOTAL_MEMORY = directory / f"memory_total_{timestamp}.png"
 
 def plot_total_memory(csv_file):
     df = pd.read_csv(csv_file)
-    df.fillna(0, inplace=True) # Fill any NA/NaN values with 0
-    
-    numeric_columns = df.columns.difference(["timestamp"])
-    df[numeric_columns] = df[numeric_columns].apply(pd.to_numeric).div(1024)
+    df.fillna(0, inplace=True)
 
-    # Check if any value in total_memory exceeds 1024 MB (1 GB)
-    if df["total_memory"].max() > 1024:
-        df["total_memory"] = df["total_memory"].div(1024)  # convert to GB
+    numeric_columns = df.columns.difference(["timestamp"])
+    memory_data = (
+        df[numeric_columns].apply(pd.to_numeric, errors="coerce") / 1024
+    )  # Convert to MB
+
+    # Check if total_memory column exceeds 1024 MB (1 GB)
+    if memory_data["total_memory"].max() > 1024:
+        memory_data["total_memory"] = (
+            memory_data["total_memory"] / 1024
+        )  # Convert to GB
         memory_unit = "GB"
     else:
         memory_unit = "MB"
+
+    df[numeric_columns] = memory_data
 
     df["timestamp"] = pd.to_datetime(df["timestamp"], unit="s")
 
@@ -58,15 +64,19 @@ def plot_memory_data(csv_file):
     df.fillna(0, inplace=True) # Fill any NA/NaN values with 0
 
     numeric_columns = df.columns.difference(["timestamp"])
-    df[numeric_columns] = df[numeric_columns].apply(pd.to_numeric).div(1024)
+    # Convert numeric columns to float (MB) in one step
+    memory_data = df[numeric_columns].apply(pd.to_numeric, errors="coerce") / 1024
 
-    # Determine if any memory values exceed 1024 MB (indicating we should use GB)
-    exceeds_gb = df[numeric_columns].max().max() > 1024
-    if exceeds_gb:
-        df[numeric_columns] = df[numeric_columns].div(1024)  # Convert to GB
+    # Decide whether to scale to GB
+    if memory_data.to_numpy().max() > 1024:
+        memory_data = memory_data / 1024
         memory_unit = "GB"
     else:
         memory_unit = "MB"
+
+    df[numeric_columns] = memory_data
+
+    logging.info(f"Memory unit selected: {memory_unit}")
 
     df["timestamp"] = pd.to_datetime(df["timestamp"], unit="s")
     df["timestamp"] = df["timestamp"].dt.strftime("%H:%M")

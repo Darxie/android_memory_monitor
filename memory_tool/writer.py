@@ -2,6 +2,7 @@ import csv
 import subprocess
 from pathlib import Path
 import logging
+import time
 from utils import execute_adb_command, _write_to_file
 from timestamp import ExecutionTimestamp
 import plotter
@@ -52,6 +53,7 @@ class Writer:
 
     def plot_data_from_csv(self):
         logging.info("\nPlotting memory data from CSV file...")
+        wait_until_file_is_readable(CSV_FILE)
         plotter.plot_memory_data(CSV_FILE)
 
     def _app_crashed(self, logcat_output, package_name):
@@ -86,6 +88,21 @@ class Writer:
             )
             _write_to_file(LOGCAT_FILE, sygic_logs + "\n")
             subprocess.run(["adb", "logcat", "-c"])
-            #logging.info(f"Logs with tag 'SYGIC' have been saved to {LOGCAT_FILE}")
-            #logging.info("crash check returned false")
+            # logging.info(f"Logs with tag 'SYGIC' have been saved to {LOGCAT_FILE}")
+            # logging.info("crash check returned false")
             return False
+
+
+def wait_until_file_is_readable(path, timeout=5):
+    """Wait until the file can be opened for reading."""
+    start_time = time.time()
+    while True:
+        try:
+            with open(path, "r", encoding="utf-8"):
+                return  # File is ready
+        except (PermissionError, OSError):
+            if time.time() - start_time > timeout:
+                raise TimeoutError(
+                    f"File {path} is still locked after {timeout} seconds."
+                )
+            time.sleep(0.1)
