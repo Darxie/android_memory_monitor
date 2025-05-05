@@ -60,7 +60,7 @@ style.configure("TCombobox", font=("Helvetica", 12), padding=10)
 
 # Adjusted window dimensions to accommodate all elements
 window_width = 1100
-window_height = 300
+window_height = 400
 screen_width = root.winfo_screenwidth()
 screen_height = root.winfo_screenheight()
 x = (screen_width / 2) - (window_width / 2)
@@ -102,15 +102,24 @@ task_frame = ttk.Frame(root)
 task_frame.pack(pady=20)
 
 # Organizing buttons with better spacing
-task_options = ["search", "demonstrate", "compute", "fg_bg", "zoom", "freedrive", "demon_fg_bg"]
-for task in task_options:
+task_options = [
+    "search",
+    "demonstrate",
+    "compute",
+    "fg_bg",
+    "zoom",
+    "freedrive",
+    "demon_fg_bg",
+    "recompute",
+]
+for idx, task in enumerate(task_options):
     button = ttk.Button(
         task_frame,
         text=task,
         command=lambda button_task=task: on_selection_made("task", button_task),
         style="TButton",
     )
-    # This arrangement will ensure all buttons are visible and well spaced
-    button.pack(side=tk.LEFT, padx=10, pady=10)
+    # Use grid layout: 4 buttons per row
+    button.grid(row=idx // 4, column=idx % 4, padx=10, pady=10)
 
 root.mainloop()

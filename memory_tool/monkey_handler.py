@@ -10,6 +10,7 @@ import use_cases.use_case_search as search
 import use_cases.use_case_zoom as zoom
 import use_cases.use_case_freedrive as freedrive
 import use_cases.use_case_navi_fg_bg as demon_fg_bg
+import use_cases.use_case_recompute as recompute
 
 from timestamp import ExecutionTimestamp
 from writer import Writer
@@ -91,6 +92,9 @@ def run_automation_tasks(package_name, use_case, device_code):
             threading.Thread(target=freedrive.run, args=(memory_tool,)).start()
         elif use_case == "demon_fg_bg":
             demon_fg_bg.simulate_user_interactions(device, memory_tool)
+        elif use_case == "recompute":
+            recompute.simulate_user_interactions(device, memory_tool)
+
     except Exception:
         logging.warning("Exception in automation, stopping monitoring")
         memory_tool.stop_monitoring()
