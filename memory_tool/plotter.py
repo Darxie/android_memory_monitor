@@ -44,7 +44,7 @@ def plot_total_memory(csv_file):
     plt.tight_layout()
 
     plt.gca().xaxis.set_major_formatter(mdates.DateFormatter("%H:%M"))
-    plt.gca().xaxis.set_major_locator(mdates.HourLocator())
+    plt.gca().xaxis.set_major_locator(mdates.AutoDateLocator())
 
     plt.xticks(rotation=45)
     plt.savefig(IMAGE_TOTAL_MEMORY)
@@ -79,7 +79,6 @@ def plot_memory_data(csv_file):
     logging.info(f"Memory unit selected: {memory_unit}")
 
     df["timestamp"] = pd.to_datetime(df["timestamp"], unit="s")
-    df["timestamp"] = df["timestamp"].dt.strftime("%H:%M")
 
     plt.figure(figsize=(14, 8))
     plt.stackplot(
@@ -99,7 +98,7 @@ def plot_memory_data(csv_file):
     plt.xticks(rotation=45)
 
     plt.gca().xaxis.set_major_formatter(mdates.DateFormatter("%H:%M"))
-    plt.gca().xaxis.set_major_locator(mdates.HourLocator())
+    plt.gca().xaxis.set_major_locator(mdates.AutoDateLocator())
 
     plt.savefig(IMAGE_STACKED_MEMORY)
     logging.info("\nPlotting stacked memory data plot completed.\n\n")
