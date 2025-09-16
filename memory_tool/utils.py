@@ -125,15 +125,7 @@ def take_info_about_screenshot(device):
     # Take screenshot
     device.screenshot(JPEG_FILE)
     # Get back to map
-    device.xpath(
-        "//androidx.compose.ui.platform.ComposeView/android.view.View[1]/android.view.View[1]"
-    ).click()
-    device.xpath(
-        "//androidx.compose.ui.platform.ComposeView/android.view.View[1]/android.view.View[1]"
-    ).click()
-    device.xpath(
-        "//androidx.compose.ui.platform.ComposeView/android.view.View[1]/android.view.View[1]"
-    ).click()
-    device.xpath(
-        "//androidx.compose.ui.platform.ComposeView/android.view.View[1]/android.view.View[1]"
-    ).click()
+    device.xpath('//*[@resource-id="BackButton"]').click()
+    device.xpath('//*[@resource-id="Settings.Back"]').click()
+    device.xpath('//*[@resource-id="Settings.Back"]').click()
+    device.xpath('//*[@resource-id="MainMenu.Back"]').click()

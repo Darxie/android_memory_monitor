@@ -30,7 +30,7 @@ def simulate_user_interactions(device, memory_tool):
         time.sleep(
             10
         )  # depends on the device's compute performance. adjust accordingly
-
+        device(text="OK, got it").click()
         device.press("back")
     memory_tool.stop_monitoring()
 

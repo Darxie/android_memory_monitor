@@ -18,8 +18,7 @@ def add_watcher(device, memory_tool, stop_event):
 
 
 def watcher_refresh_loop(device, memory_tool, stop_event):
-    if not device.uiautomator.running():
-        device.uiautomator.start()
+    device.reset_uiautomator()
     while not stop_event.is_set():
         add_watcher(device, memory_tool, stop_event)
         time.sleep(1800)  # Wait for 30 min before refreshing the watcher
@@ -51,9 +50,10 @@ def simulate_user_interactions(device, memory_tool):
 
     device(text="Get directions").click()
     time.sleep(10)  # depends on the device's compute performance. adjust accordingly
-    device(
-        resourceId="com.sygic.profi.beta:id/routePlannerDetailBottomSheetContent"
-    ).swipe("up")
+    device(text="OK, got it").click()
+    device.xpath(
+        '//*[@resource-id="com.sygic.profi.beta:id/fragmentContainer"]/androidx.compose.ui.platform.ComposeView[1]/android.view.View[1]/android.view.View[3]/android.view.View[1]/android.view.View[1]'
+    ).click()
     time.sleep(1)
     device(text="Demonstrate route").click()
 
@@ -75,7 +75,9 @@ def stop_demonstrate(device, memory_tool, stop_event):
         None
     """
     stop_event.set()
-    device(resourceId="com.sygic.profi.beta:id/remainingTime").click()  # swipe up
+    device(
+        resourceId="com.sygic.profi.beta:id/infoBarNavigateDragHandle"
+    ).click()  # swipe up
     time.sleep(1)
     device.xpath('//*[@text="Cancel route"]').click()  # cancel route
     logging.info("canceled route")
