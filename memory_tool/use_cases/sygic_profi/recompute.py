@@ -2,13 +2,14 @@ import time
 import logging
 import threading
 import utils
+from . import shared
 
 """
 NECESSARY MAPS - Slovakia, Austria, Italy
 """
 
 
-def simulate_user_interactions(device, memory_tool):
+def run_test(device, memory_tool):
     """
     Simulate user interactions on the device.
     """
@@ -21,7 +22,7 @@ def simulate_user_interactions(device, memory_tool):
     stop_timer.start()  # Start the timer
 
     time.sleep(2)
-    tap_search_bar(device)
+    shared.tap_search_bar(device)
     time.sleep(2)
     device(focused=True).set_text("Horné obdokovce")
     time.sleep(4)
@@ -51,18 +52,3 @@ def stop_demonstrate(device, memory_tool, stop_event):
     """
     stop_event.set()
     memory_tool.stop_monitoring()
-
-
-def tap_search_bar(device):
-    """
-    Taps on the search bar of the Sygic app.
-
-    Args:
-        device: The device object representing the Android device.
-
-    Returns:
-        None
-    """
-    device.xpath(
-        '//*[@resource-id="com.sygic.profi.beta:id/composeView_searchBar"]/android.view.View[1]/android.view.View[1]'
-    ).click()

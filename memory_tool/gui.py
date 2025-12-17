@@ -2,27 +2,50 @@ import tkinter as tk
 from tkinter import ttk
 import monkey_handler
 from typing import List, Tuple
-
 import re
 import subprocess
 
-# Initialize APP_ID with a default value
-APP_ID = "com.sygic.profi.beta"
-selected_device_code = None
+# Import the application configuration
+from config import APPLICATIONS
 
-# Function to be called when dropdown selections are made or buttons are clicked
-def on_selection_made(selection_type, value):
-    global APP_ID, selected_device_code
-    if selection_type == "app_mode":
-        APP_ID = (
-            "com.sygic.profi.beta"
-            if value == "release"
-            else "com.sygic.profi.beta.debug"
-        )
-    else:  # For other selections (tasks), handle accordingly
-        print(f"Executing {value} with APP_ID {APP_ID}")
-        root.destroy()
-        monkey_handler.run_automation_tasks(APP_ID, value, selected_device_code)
+# --- Global Variables ---
+selected_device_code = None
+selected_app_name = None
+selected_build_version = "release"
+
+
+def get_package_name():
+    """Gets the package name based on the selected app and build version."""
+    if selected_app_name and selected_build_version:
+        app_config = APPLICATIONS.get(selected_app_name)
+        if app_config:
+            return app_config["package_name"].get(selected_build_version)
+    return None
+
+
+def on_task_selected(task):
+    """Handles task button clicks."""
+    package_name = get_package_name()
+    if not selected_device_code:
+        print("Please select a device.")
+        return
+    if not selected_app_name:
+        print("Please select an application.")
+        return
+    if not package_name:
+        print("Could not determine package name.")
+        return
+
+    print(
+        f"Executing {task} for {selected_app_name} ({package_name}) on device {selected_device_code}"
+    )
+    root.destroy()
+    monkey_handler.run_automation_tasks(
+        APPLICATIONS[selected_app_name]["internal_name"],
+        package_name,
+        task,
+        selected_device_code,
+    )
 
 
 def get_connected_devices():
@@ -46,6 +69,36 @@ def on_device_selected(event):
     global selected_device_code
     # Extract device code from the dropdown's value
     selected_device_code = device_dropdown.get().split()[-1]
+
+
+def on_build_version_selected(event):
+    global selected_build_version
+    selected_build_version = app_mode.get()
+
+
+def on_app_selected(event):
+    global selected_app_name
+    selected_app_name = app_name_var.get()
+    update_task_buttons()
+
+
+def update_task_buttons():
+    """Clears and creates task buttons based on the selected application."""
+    for widget in task_frame.winfo_children():
+        widget.destroy()
+
+    if selected_app_name:
+        app_config = APPLICATIONS.get(selected_app_name)
+        if app_config:
+            task_options = app_config["use_cases"]
+            for idx, task in enumerate(task_options):
+                button = ttk.Button(
+                    task_frame,
+                    text=task,
+                    command=lambda button_task=task: on_task_selected(button_task),
+                    style="TButton",
+                )
+                button.grid(row=idx // 4, column=idx % 4, padx=10, pady=10)
 
 
 # Initialize the main window
@@ -77,10 +130,18 @@ device_dropdown = ttk.Combobox(
 )
 device_dropdown["values"] = (
     get_connected_devices()
-)  
-# Populate dropdown with connected devices
+)
 device_dropdown.pack(pady=5)
 device_dropdown.bind("<<ComboboxSelected>>", on_device_selected)
+
+# Application Dropdown
+app_label = ttk.Label(root, text="Select Application:", font=("Helvetica", 14))
+app_label.pack(pady=(20, 5))
+app_name_var = tk.StringVar()
+app_dropdown = ttk.Combobox(root, textvariable=app_name_var, state="readonly", width=20)
+app_dropdown["values"] = list(APPLICATIONS.keys())
+app_dropdown.pack(pady=5)
+app_dropdown.bind("<<ComboboxSelected>>", on_app_selected)
 
 # Label for build version selection
 build_version_label = ttk.Label(root, text="Build Version:", font=("Helvetica", 14))
@@ -93,33 +154,12 @@ app_mode_dropdown = ttk.Combobox(
 )
 app_mode_dropdown["values"] = ("release", "debug")
 app_mode_dropdown.pack(pady=5)
-app_mode_dropdown.bind(
-    "<<ComboboxSelected>>", lambda event: on_selection_made("app_mode", app_mode.get())
-)
+app_mode_dropdown.bind("<<ComboboxSelected>>", on_build_version_selected)
+
 
 # Task selection area with more organized layout
 task_frame = ttk.Frame(root)
 task_frame.pack(pady=20)
-
-# Organizing buttons with better spacing
-task_options = [
-    "search",
-    "demonstrate",
-    "compute",
-    "fg_bg",
-    "zoom",
-    "freedrive",
-    "demon_fg_bg",
-    "recompute",
-]
-for idx, task in enumerate(task_options):
-    button = ttk.Button(
-        task_frame,
-        text=task,
-        command=lambda button_task=task: on_selection_made("task", button_task),
-        style="TButton",
-    )
-    # Use grid layout: 4 buttons per row
-    button.grid(row=idx // 4, column=idx % 4, padx=10, pady=10)
+update_task_buttons()  # Initial population (will be empty)
 
 root.mainloop()

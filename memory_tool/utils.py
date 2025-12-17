@@ -107,25 +107,14 @@ def _write_to_file(filename, content):
 
 def take_info_about_screenshot(device):
     # Menu - Settings - Info - About
-    device.xpath(
-        '//*[@resource-id="com.sygic.profi.beta:id/composeView_searchBar"]/android.view.View[1]/android.view.View[2]'
-    ).click()
-    device.xpath(
-        "//androidx.compose.ui.platform.ComposeView/android.view.View[1]/android.view.View[6]"
-    ).click()
-    device.xpath(
-        "//androidx.compose.ui.platform.ComposeView/android.view.View[1]/android.view.View[2]/android.view.View[5]"
-    ).click()
-    device.xpath(
-        "//androidx.compose.ui.platform.ComposeView/android.view.View[1]/android.view.View[2]/android.view.View[1]"
-    ).click()
-    device.xpath(
-        "//androidx.compose.ui.platform.ComposeView/android.view.View[1]/android.view.View[2]/android.view.View[1]"
-    ).click()
+    device(resourceId="SearchBar.MenuIcon").click()
+    device(resourceId="MainMenu.Settings").click()
+    device(resourceId="Settings.Info").click()
+    device(resourceId="Settings.Info.About").click()
     # Take screenshot
     device.screenshot(JPEG_FILE)
     # Get back to map
-    device.xpath('//*[@resource-id="BackButton"]').click()
-    device.xpath('//*[@resource-id="Settings.Back"]').click()
-    device.xpath('//*[@resource-id="Settings.Back"]').click()
-    device.xpath('//*[@resource-id="MainMenu.Back"]').click()
+    device(resourceId="BackButton").click()
+    device(resourceId="Settings.Back").click()
+    device(resourceId="Settings.Back").click()
+    device(resourceId="MainMenu.Back").click()

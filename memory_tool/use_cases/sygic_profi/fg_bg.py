@@ -3,7 +3,7 @@ import utils
 import logging
 
 
-def simulate_user_interactions(memory_tool):
+def run_test(device, memory_tool):
     for i in range(0, 100):
         logging.info(f"Mambo number {i+1}")
         time.sleep(25)

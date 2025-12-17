@@ -1,19 +1,13 @@
 import sys
 import utils
+import shutil
 import logging
 import threading
+import importlib
 import uiautomator2 as u2
-import use_cases.use_case_demonstrate as demon
-import use_cases.use_case_compute as compute
-import use_cases.use_case_fg_bg as fg_bg
-import use_cases.use_case_search as search
-import use_cases.use_case_zoom as zoom
-import use_cases.use_case_freedrive as freedrive
-import use_cases.use_case_navi_fg_bg as demon_fg_bg
-import use_cases.use_case_recompute as recompute
 
 from timestamp import ExecutionTimestamp
-from writer import Writer
+from writer import Writer, directory
 from memory_monitor import MemoryTool
 
 
@@ -22,6 +16,7 @@ logging.basicConfig(
     level=logging.DEBUG, format="%(asctime)s - %(levelname)s - %(message)s",
     handlers=[logging.FileHandler("python_run_log.txt"), logging.StreamHandler()]
 )
+logging.getLogger('matplotlib').setLevel(logging.WARNING)
 
 
 def initialize_device(package_name, device_code):
@@ -32,74 +27,66 @@ def initialize_device(package_name, device_code):
     device.app_stop(package_name)  # force close app if running
     logging.info(f"Connected to device: \n{device_code}  \n{device.info}")
     device.screen_on()
-    # device.app_start(package_name)
-    utils.execute_adb_command(
-        [
-            "adb",
-            "shell",
-            "am",
-            "start",
-            "-n",
-            "com.sygic.profi.beta/com.sygic.profi.platform.splashscreen.feature.ui.main.SplashScreenActivity",
-        ]
-    )
+
+    # TODO: The start activity should be part of the config
+    if "sygic" in package_name:
+        utils.execute_adb_command(
+            [
+                "adb",
+                "shell",
+                "am",
+                "start",
+                "-n",
+                "com.sygic.profi.beta/com.sygic.profi.platform.splashscreen.feature.ui.main.SplashScreenActivity",
+            ]
+        )
+    else:
+        device.app_start(package_name)
+
     utils.execute_adb_command(["adb", "logcat", "-c"])
     return device
 
 
-def run_automation_tasks(package_name, use_case, device_code):
+def run_automation_tasks(app_name_internal, package_name, use_case, device_code):
     """
     Runs automation tasks for the given package name.
 
     Args:
+        app_name_internal (str): The internal name of the application (e.g., 'sygic_profi').
         package_name (str): The name of the package to run automation tasks for.
         use_case (str): use case shortened name
         device_code (str): unique device code
-
-    Returns:
-        None
     """
 
-    # initialize timestamp
     ExecutionTimestamp.get_timestamp()
-
     device = initialize_device(package_name, device_code)
-
-    # Set up synchronization event
     monitoring_finished_event = threading.Event()
-
-    # Start Monitoring Event
     writer = Writer()
-
     memory_tool = MemoryTool(writer, package_name, monitoring_finished_event)
     threading.Thread(target=memory_tool.start_monitoring).start()
 
     utils.print_app_info(device, package_name, use_case)
 
-    # User Interaction Event
     try:
-        if use_case == "search":
-            search.simulate_user_interactions(device, memory_tool)
-        elif use_case == "demonstrate":
-            demon.simulate_user_interactions(device, memory_tool)
-        elif use_case == "compute":
-            compute.simulate_user_interactions(device, memory_tool)
-        elif use_case == "fg_bg":
-            fg_bg.simulate_user_interactions(memory_tool)
-        elif use_case == "zoom":
-            zoom.simulate_user_interactions(device, memory_tool)
-        elif use_case == "freedrive":
-            threading.Thread(target=freedrive.run, args=(memory_tool,)).start()
-        elif use_case == "demon_fg_bg":
-            demon_fg_bg.simulate_user_interactions(device, memory_tool)
-        elif use_case == "recompute":
-            recompute.simulate_user_interactions(device, memory_tool)
+        module_name = f"use_cases.{app_name_internal}.{use_case}"
+        logging.info(f"Dynamically loading module: {module_name}")
+        use_case_module = importlib.import_module(module_name)
 
-    except Exception:
-        logging.warning("Exception in automation, stopping monitoring")
+        # The new standard entry point for all use cases is run_test.
+        # The run_test function is responsible for its own threading if needed (e.g., freedrive).
+        # The signature is consistent: run_test(device, memory_tool).
+        use_case_module.run_test(device, memory_tool)
+
+    except Exception as e:
+        logging.error(f"Exception in automation: {e}", exc_info=True)
         memory_tool.stop_monitoring()
+        try:
+            logging.info(f"An error occurred. Deleting output directory: {directory}")
+            shutil.rmtree(directory)
+            logging.info("Output directory deleted successfully.")
+        except OSError as e_rm:
+            logging.error(f"Error deleting directory {directory}: {e_rm}")
 
     monitoring_finished_event.wait()
-
     writer.plot_data_from_csv()
     device.app_stop(package_name)

@@ -1,6 +1,7 @@
 import time
 import logging
 import threading
+from . import shared
 
 """
 NECESSARY MAPS - Slovakia, Austria, Germany
@@ -24,7 +25,7 @@ def watcher_refresh_loop(device, memory_tool, stop_event):
         time.sleep(1800)  # Wait for 30 min before refreshing the watcher
 
 
-def simulate_user_interactions(device, memory_tool):
+def run_test(device, memory_tool):
     """
     Simulate user interactions on the device.
     """
@@ -36,26 +37,24 @@ def simulate_user_interactions(device, memory_tool):
     )
     stop_timer.start()  # Start the timer
 
-    time.sleep(2)
-    tap_search_bar(device)
-    time.sleep(2)
+    shared.tap_search_bar(device)
+
     device(focused=True).set_text(
         "burgerhaus zeughaustrasse philippsburg"
     )
-    time.sleep(4)
-    device.xpath(
-        '//*[@resource-id="com.sygic.profi.beta:id/recyclerView"]/android.view.ViewGroup[1]/android.widget.TextView[1]'
-    ).click()
+    if (device(resourceId="com.sygic.profi.beta:id/searchItemTitle").exists(timeout=5)):
+        device(resourceId="com.sygic.profi.beta:id/searchItemTitle").click()
+
     time.sleep(1)
 
-    device(text="Get directions").click()
-    time.sleep(10)  # depends on the device's compute performance. adjust accordingly
-    device(text="OK, got it").click()
-    device.xpath(
-        '//*[@resource-id="com.sygic.profi.beta:id/fragmentContainer"]/androidx.compose.ui.platform.ComposeView[1]/android.view.View[1]/android.view.View[3]/android.view.View[1]/android.view.View[1]'
-    ).click()
+    device(resourceId="SearchDestination.GetDirections").click()
+
+    if (device(text="OK, got it").exists(timeout=10)):
+        device(text="OK, got it").click()
+
+    device(text="No traffic data").click()
     time.sleep(1)
-    device(text="Demonstrate route").click()
+    device(text="Demonstrate route").click(timeout=5)
 
     time.sleep(3)
 
@@ -75,26 +74,9 @@ def stop_demonstrate(device, memory_tool, stop_event):
         None
     """
     stop_event.set()
-    device(
-        resourceId="com.sygic.profi.beta:id/infoBarNavigateDragHandle"
-    ).click()  # swipe up
+    device(resourceId="InfoBarBottomSheet.Button.Expand").click()  # swipe up
     time.sleep(1)
-    device.xpath('//*[@text="Cancel route"]').click()  # cancel route
+    device(resourceId="InfoBarBottomSheet.Button.Cancel route").click()  # cancel route 
     logging.info("canceled route")
     time.sleep(5)
     memory_tool.stop_monitoring()
-
-
-def tap_search_bar(device):
-    """
-    Taps on the search bar of the Sygic app.
-
-    Args:
-        device: The device object representing the Android device.
-
-    Returns:
-        None
-    """
-    device.xpath(
-        '//*[@resource-id="com.sygic.profi.beta:id/composeView_searchBar"]/android.view.View[1]/android.view.View[1]'
-    ).click()
