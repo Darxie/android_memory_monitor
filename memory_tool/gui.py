@@ -100,6 +100,12 @@ def update_task_buttons():
                 )
                 button.grid(row=idx // 4, column=idx % 4, padx=10, pady=10)
 
+    # Adjust window size to fit contents, maintaining minimum width
+    root.update_idletasks()
+    new_width = max(1100, root.winfo_reqwidth())
+    new_height = root.winfo_reqheight()
+    root.geometry(f"{new_width}x{new_height}")
+
 
 # Initialize the main window
 root = tk.Tk()
