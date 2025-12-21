@@ -3,7 +3,7 @@ import subprocess
 from pathlib import Path
 import logging
 import time
-from utils import execute_adb_command, _write_to_file
+from utils import execute_adb_command, _write_to_file, get_app_pid
 from timestamp import ExecutionTimestamp
 import plotter
 
@@ -65,14 +65,30 @@ class Writer:
         :return: True if crash detected, False otherwise.
         """
         lines = logcat_output.splitlines()
+        lookahead = 50  # Increased lookahead to catch the process name in stack traces
+        
         for i, line in enumerate(lines):
-            if any(error_signal in line for error_signal in ERROR_SIGNALS):
-                for j in range(i, min(i + FATAL_EXCEPTION_LOOKAHEAD, len(lines))):
+            # 1. Java Crash Detection
+            if "FATAL EXCEPTION" in line:
+                # Look for "Process: com.example.package" which is standard in AndroidRuntime logs
+                # Or check if the package name appears in the stack trace lines immediately following
+                for j in range(i, min(i + lookahead, len(lines))):
+                    if f"Process: {package_name}" in lines[j]:
+                        return True
                     if package_name in lines[j]:
                         return True
+
+            # 2. Native Crash Detection
+            if "Fatal signal" in line:
+                # Native crashes (tombstones) usually print: 
+                # "pid: 1234, tid: 5678, name: ThreadName  >>> com.example.package <<<"
+                for j in range(i, min(i + lookahead, len(lines))):
+                    if f">>> {package_name} <<<" in lines[j]:
+                        return True
+                    
         return False
 
-    def capture_sygic_log(self, package_name):
+    def capture_app_log(self, package_name):
         logcat_output = execute_adb_command(["adb", "logcat", "-d"])
 
         if self._app_crashed(logcat_output, package_name):
@@ -81,20 +97,28 @@ class Writer:
             logging.info("crash check returned true - app crashed")
             return True
         else:
-            sygic_logs = "\n".join(
-                execute_adb_command(
-                    ["adb", "logcat", "-d", "-s", "SYGIC"]
-                ).splitlines()[1:]
-            )
-            _write_to_file(LOGCAT_FILE, sygic_logs + "\n")
+            # Filter logs by PID
+            pid = get_app_pid(package_name)
+            if pid and pid != "None":
+                # Filter lines containing the PID (surrounded by spaces or followed by colon)
+                # This helps avoid matching similar numbers in timestamps etc.
+                filtered_logs = [
+                    line for line in logcat_output.splitlines() 
+                    if f" {pid} " in line or f"{pid}:" in line
+                ]
+                if filtered_logs:
+                    _write_to_file(LOGCAT_FILE, "\n".join(filtered_logs) + "\n")
+            
             subprocess.run(["adb", "logcat", "-c"])
-            # logging.info(f"Logs with tag 'SYGIC' have been saved to {LOGCAT_FILE}")
-            # logging.info("crash check returned false")
             return False
 
 
 def wait_until_file_is_readable(path, timeout=5):
     """Wait until the file can be opened for reading."""
+    path_obj = Path(path)
+    if not path_obj.exists():
+        raise FileNotFoundError(f"File {path} does not exist.")
+
     start_time = time.time()
     while True:
         try:

@@ -5,10 +5,12 @@ import logging
 import threading
 import importlib
 import uiautomator2 as u2
+from pathlib import Path
 
 from timestamp import ExecutionTimestamp
-from writer import Writer, directory
+from writer import Writer, directory, CSV_FILE
 from memory_monitor import MemoryTool
+import plotter
 
 
 # Set up logging configuration
@@ -19,7 +21,7 @@ logging.basicConfig(
 logging.getLogger('matplotlib').setLevel(logging.WARNING)
 
 
-def initialize_device(package_name, device_code):
+def initialize_device(package_name, device_code, start_activity=None):
     """
     Initialize connection to the Android device and launch the application.
     """
@@ -28,8 +30,10 @@ def initialize_device(package_name, device_code):
     logging.info(f"Connected to device: \n{device_code}  \n{device.info}")
     device.screen_on()
 
-    # TODO: The start activity should be part of the config
-    if "sygic" in package_name:
+    if start_activity:
+        logging.info(f"Starting specific activity: {start_activity}")
+        # Construct component name: package/activity
+        component = f"{package_name}/{start_activity}"
         utils.execute_adb_command(
             [
                 "adb",
@@ -37,32 +41,35 @@ def initialize_device(package_name, device_code):
                 "am",
                 "start",
                 "-n",
-                "com.sygic.profi.beta/com.sygic.profi.platform.splashscreen.feature.ui.main.SplashScreenActivity",
+                component,
             ]
         )
     else:
+        logging.info(f"Starting default activity for package: {package_name}")
         device.app_start(package_name)
 
     utils.execute_adb_command(["adb", "logcat", "-c"])
     return device
 
 
-def run_automation_tasks(app_name_internal, package_name, use_case, device_code):
+def run_automation_tasks(app_name_internal, package_name, use_case, device_code, log_interval=5, start_activity=None):
     """
     Runs automation tasks for the given package name.
 
     Args:
-        app_name_internal (str): The internal name of the application (e.g., 'sygic_profi').
+        app_name_internal (str): The internal name of the application.
         package_name (str): The name of the package to run automation tasks for.
         use_case (str): use case shortened name
         device_code (str): unique device code
+        log_interval (int): Interval in seconds for memory logging.
+        start_activity (str): Optional specific activity to launch.
     """
 
     ExecutionTimestamp.get_timestamp()
-    device = initialize_device(package_name, device_code)
+    device = initialize_device(package_name, device_code, start_activity)
     monitoring_finished_event = threading.Event()
     writer = Writer()
-    memory_tool = MemoryTool(writer, package_name, monitoring_finished_event)
+    memory_tool = MemoryTool(writer, package_name, device, monitoring_finished_event)
     threading.Thread(target=memory_tool.start_monitoring).start()
 
     utils.print_app_info(device, package_name, use_case)

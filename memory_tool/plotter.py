@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 from pathlib import Path
 import matplotlib.dates as mdates
 import logging
+import numpy as np
 from timestamp import ExecutionTimestamp
 
 
@@ -12,6 +13,85 @@ directory = Path(f"output/{timestamp}")
 
 IMAGE_STACKED_MEMORY = directory / f"memory_stacked_line_chart_{timestamp}.png"
 IMAGE_TOTAL_MEMORY = directory / f"memory_total_{timestamp}.png"
+ANALYSIS_FILE = directory / f"memory_analysis_{timestamp}.txt"
+
+
+def analyze_trends(csv_file_path):
+    """
+    Analyzes memory usage trends to detect potential leaks.
+    Writes a report to a text file and logs it.
+    """
+    try:
+        df = pd.read_csv(csv_file_path)
+        if len(df) < 10:
+            msg = "Not enough data points (<10) for reliable trend analysis."
+            logging.warning(msg)
+            return
+
+        # Normalize time to start from 0
+        df['elapsed'] = df['timestamp'] - df['timestamp'].iloc[0]
+
+        report = []
+        report.append("=" * 40)
+        report.append("       MEMORY TREND ANALYSIS       ")
+        report.append("=" * 40)
+        report.append(f"Duration: {df['elapsed'].iloc[-1] / 60:.2f} minutes")
+        report.append(f"Data Points: {len(df)}")
+        report.append("-" * 40)
+
+        metrics = ['total_memory', 'java_heap', 'native_heap', 'code', 'stack', 'graphics']
+        leaks = []
+
+        for metric in metrics:
+            if metric not in df.columns: continue
+
+            # Clean data: Convert to numeric, handle NA, convert KB to MB
+            # The CSV values are in KB (from dumpsys).
+            y_kb = pd.to_numeric(df[metric], errors='coerce').fillna(0)
+            x_sec = df['elapsed']
+
+            # Linear regression: y = mx + c
+            # Slope (m) is KB/second
+            if len(x_sec) > 1:
+                slope, intercept = np.polyfit(x_sec, y_kb, 1)
+            else:
+                slope = 0
+
+            # Convert slope to MB/minute for readability
+            # KB/sec * 60 sec/min / 1024 KB/MB = MB/min
+            slope_mb_min = slope * 60 / 1024
+            
+            # Define thresholds
+            # > 1 MB/min is huge. > 0.1 MB/min is concerning.
+            if slope_mb_min > 0.5:
+                status = "CRITICAL LEAK"
+                leaks.append(f"{metric} (Critical)")
+            elif slope_mb_min > 0.05:
+                status = "WARNING (Rising)"
+                leaks.append(f"{metric} (Warning)")
+            elif slope_mb_min < -0.05:
+                status = "Recovering"
+            else:
+                status = "Stable"
+
+            report.append(f"{metric:<15} | {slope_mb_min:+.3f} MB/min | {status}")
+
+        report.append("-" * 40)
+        if leaks:
+            report.append(f"⚠️  POTENTIAL LEAKS DETECTED:\n   - " + "\n   - ".join(leaks))
+        else:
+            report.append("✅  No significant continuous leaks detected.")
+        report.append("=" * 40)
+
+        report_str = "\n".join(report)
+        logging.info("\n" + report_str + "\n")
+
+        # Save to file
+        with open(ANALYSIS_FILE, "w", encoding="utf-8") as f:
+            f.write(report_str)
+
+    except Exception as e:
+        logging.error(f"Error analyzing memory trends: {e}")
 
 
 def plot_total_memory(csv_file):

@@ -24,9 +24,7 @@ def select_first_result(device):
     Args:
         device: The device object.
     """
-    device.xpath(
-        '//*[@resource-id="com.sygic.profi.beta:id/recyclerView"]/android.view.ViewGroup[1]/android.widget.TextView[1]'
-    ).click()
+    device(resourceId="com.sygic.profi.beta:id/recyclerView").child(index=0).click()
 
 def tap_x_button(device):
     """

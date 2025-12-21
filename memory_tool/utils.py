@@ -111,6 +111,7 @@ def take_info_about_screenshot(device):
     device(resourceId="MainMenu.Settings").click()
     device(resourceId="Settings.Info").click()
     device(resourceId="Settings.Info.About").click()
+    device(resourceId="Settings.Info.Product").click()
     # Take screenshot
     device.screenshot(JPEG_FILE)
     # Get back to map

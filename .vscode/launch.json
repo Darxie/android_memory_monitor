@@ -10,7 +10,6 @@
       "request": "launch",
       "module": "memory_tool.gui",
       "console": "integratedTerminal",
-      "envFile": "${workspaceFolder}/.env"
     }
   ]
 }

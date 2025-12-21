@@ -1,76 +1,77 @@
 import time
 import logging
-import utils
+import re
 
 
 class MemoryTool:
     """
-    A class that provides functionality to monitor memory usage of an Android app.
-
+    A class that provides functionality to monitor memory usage of an Android app
+    using uiautomator2 and robust regex parsing.
     """
 
     is_monitoring = False
     LOG_INTERVAL = 30  # in seconds
     last_total_memory = 0
-    last_timestamp = 0
     elapsed_time = 0
-    check_interval = 5 # in seconds
+    check_interval = 5  # in seconds
 
     def __init__(
-        self, writer, package_name, monitoring_finished_event=None
+        self, writer, package_name, device, monitoring_finished_event=None, log_interval=30
     ):
         self.writer = writer
         self.package_name = package_name
+        self.device = device
         self.monitoring_finished_event = monitoring_finished_event
+        self.log_interval = log_interval
 
     @staticmethod
-    def extract_memory_info(label, data) -> str:
+    def extract_memory_value(pattern, data) -> str:
         """
-        Extracts memory information from the given data based on the provided label.
-
-        Args:
-            label (str): The label to search for in the data.
-            data (List[str]): The list of strings containing memory information.
-
-        Returns:
-            str: The extracted memory information as a string.
+        Extracts a memory value using regex from the data string.
+        Returns "NA" if not found.
         """
-        found_app_summary = False
-        for line in data:
-            if "App Summary" in line:
-                found_app_summary = True
-                continue
-            if found_app_summary:
-                if label in line:
-                    if label == "TOTAL PSS":
-                        return line.split()[2]
-                    if label in ["Code:", "Stack:", "Graphics:"]:
-                        return line.split()[1]
-                    return line.split()[2]
-        return "NA"
+        match = re.search(pattern, data)
+        if match:
+            return match.group(1)
+        return "0"
 
     def check_for_crashes(self):
-        # capture_sygic_log returns True if app crashed
-        return self.writer.capture_sygic_log(self.package_name)
+        # capture_app_log returns True if app crashed
+        return self.writer.capture_app_log(self.package_name)
 
     def process_meminfo(self):
         """
         Extracts memory information using adb shell dumpsys meminfo command
-        and writes it to a file.
+        via uiautomator2 and writes it to a file.
         """
         timestamp = int(time.time())
-        result = utils.execute_adb_command(
-            ["adb", "shell", "dumpsys", "meminfo", self.package_name]
-        )
+        try:
+            # Execute command using uiautomator2 device connection
+            output = self.device.shell(f"dumpsys meminfo {self.package_name}").output
+        except Exception as e:
+            logging.error(f"Failed to get meminfo: {e}")
+            return
 
-        data_lines = result.split("\n")
-        total_memory = self.extract_memory_info("TOTAL PSS", data_lines)
+        # Robust regex parsing
+        # Matches "TOTAL PSS:   12345" or similar patterns
+        # Note: Dumpsys output format can vary, but "TOTAL PSS" is fairly standard in the App Summary or main table.
+        # We look for the main PSS value usually labeled as TOTAL or TOTAL PSS.
+        
+        # Strategy: Look for the specific lines in "App Summary" or the main table.
+        # This regex looks for the TOTAL PSS line.
+        total_memory = self.extract_memory_value(r"TOTAL PSS:\s+(\d+)", output)
+        if total_memory == "0":
+             # Fallback: sometimes it's just "TOTAL:"
+             total_memory = self.extract_memory_value(r"TOTAL:\s+(\d+)", output)
+
         self.last_total_memory = int(total_memory)
-        java_heap = self.extract_memory_info("Java Heap:", data_lines)
-        native_heap = self.extract_memory_info("Native Heap:", data_lines)
-        code = self.extract_memory_info("Code:", data_lines)
-        stack = self.extract_memory_info("Stack:", data_lines)
-        graphics = self.extract_memory_info("Graphics:", data_lines)
+        
+        # Extract other metrics
+        java_heap = self.extract_memory_value(r"Java Heap:\s+(\d+)", output)
+        native_heap = self.extract_memory_value(r"Native Heap:\s+(\d+)", output)
+        code = self.extract_memory_value(r"Code:\s+(\d+)", output)
+        stack = self.extract_memory_value(r"Stack:\s+(\d+)", output)
+        graphics = self.extract_memory_value(r"Graphics:\s+(\d+)", output)
 
         self.writer.write_data(
             timestamp, total_memory, java_heap, native_heap, code, stack, graphics
@@ -83,10 +84,10 @@ class MemoryTool:
         self.is_monitoring = True
         try:
             while self.is_monitoring:
-                if self.elapsed_time % self.LOG_INTERVAL == 0:
+                if self.elapsed_time % self.log_interval == 0:
                     self.process_meminfo()
                     logging.info(
-                        f" Monitoring in progress... (Total Memory: {self.last_total_memory/1024}MB)"
+                        f" Monitoring in progress... (Total Memory: {self.last_total_memory/1024:.2f}MB)"
                     )
 
                 if self.check_for_crashes():

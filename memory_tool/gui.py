@@ -1,17 +1,25 @@
 import tkinter as tk
-from tkinter import ttk
-import monkey_handler
+from tkinter import ttk, messagebox
+import runner
 from typing import List, Tuple
 import re
 import subprocess
 
 # Import the application configuration
-from config import APPLICATIONS
+from config import APPLICATIONS, DEFAULT_LOG_INTERVAL
 
 # --- Global Variables ---
 selected_device_code = None
 selected_app_name = None
 selected_build_version = "release"
+
+# Variables to store execution parameters after GUI closes
+final_task = None
+final_package_name = None
+final_device_code = None
+final_log_interval = DEFAULT_LOG_INTERVAL
+final_internal_name = None
+final_start_activity = None
 
 
 def get_package_name():
@@ -25,50 +33,80 @@ def get_package_name():
 
 def on_task_selected(task):
     """Handles task button clicks."""
+    global final_task, final_package_name, final_device_code, final_log_interval, final_internal_name, final_start_activity
+    
     package_name = get_package_name()
     if not selected_device_code:
-        print("Please select a device.")
+        messagebox.showwarning("Selection Missing", "Please select a device first.")
         return
     if not selected_app_name:
-        print("Please select an application.")
+        messagebox.showwarning("Selection Missing", "Please select an application first.")
         return
     if not package_name:
-        print("Could not determine package name.")
+        messagebox.showerror("Error", "Could not determine package name.")
         return
+    
+    try:
+        log_interval = int(log_interval_var.get())
+    except ValueError:
+        log_interval = DEFAULT_LOG_INTERVAL
+        print(f"Invalid log interval. Using default: {DEFAULT_LOG_INTERVAL}")
 
-    print(
-        f"Executing {task} for {selected_app_name} ({package_name}) on device {selected_device_code}"
-    )
-    root.destroy()
-    monkey_handler.run_automation_tasks(
-        APPLICATIONS[selected_app_name]["internal_name"],
-        package_name,
-        task,
-        selected_device_code,
-    )
+    # Store values for execution after mainloop
+    final_task = task
+    final_package_name = package_name
+    final_device_code = selected_device_code
+    final_log_interval = log_interval
+    
+    app_config = APPLICATIONS[selected_app_name]
+    final_internal_name = app_config["internal_name"]
+    final_start_activity = app_config.get("start_activity")
+
+    print(f"Selection confirmed. Closing GUI to start test: {task}")
+    
+    # Force close the GUI
+    root.quit()    # Stop mainloop
+    root.destroy() # Destroy window
 
 
 def get_connected_devices():
-    # Use 'adb devices -l' to get more details about connected devices
-    result = subprocess.check_output(["adb", "devices", "-l"])
-    lines = result.splitlines()
-    devices: List[Tuple[str, str]] = []
-    for line in lines[1:]:  # Skip the first line which is a header
-        line_str = line.decode("utf-8")
-        # Use regex to find the model name, including models with spaces
-        match = re.search(r"model:(\S+)", line_str)
-        if match:
-            model = match.group(1)
-            # Replace underscores with spaces to handle models with spaces properly
-            model_name = model.replace("_", " ")
-            devices.append((model_name, line_str.split()[0]))
-    return devices
+    try:
+        # Use 'adb devices -l' to get more details about connected devices
+        result = subprocess.check_output(["adb", "devices", "-l"])
+        lines = result.splitlines()
+        devices: List[Tuple[str, str]] = []
+        for line in lines[1:]:  # Skip the first line which is a header
+            line_str = line.decode("utf-8")
+            if not line_str.strip(): continue
+            # Use regex to find the model name, including models with spaces
+            match = re.search(r"model:(\S+)", line_str)
+            if match:
+                model = match.group(1)
+                # Replace underscores with spaces to handle models with spaces properly
+                model_name = model.replace("_", " ")
+                devices.append((model_name, line_str.split()[0]))
+            else:
+                # Fallback if model not found
+                parts = line_str.split()
+                if len(parts) > 0 and parts[0] != 'List':
+                    devices.append(("Unknown Model", parts[0]))
+        return devices
+    except Exception as e:
+        print(f"Error getting devices: {e}")
+        return []
 
 
-def on_device_selected(event):
+def on_combobox_select(event):
     global selected_device_code
-    # Extract device code from the dropdown's value
-    selected_device_code = device_dropdown.get().split()[-1]
+    selection = device_dropdown.get()
+    # Find the device code corresponding to the selection
+    match = re.search(r"\((.*?)\)", selection)
+    if match:
+        selected_device_code = match.group(1)
+    else:
+        selected_device_code = selection.split()[-1]
+    
+    print(f"Device selected: {selected_device_code}")
 
 
 def on_build_version_selected(event):
@@ -116,10 +154,11 @@ style = ttk.Style()
 style.configure("TButton", font=("Helvetica", 12), padding=10)
 style.configure("TLabel", font=("Helvetica", 14))
 style.configure("TCombobox", font=("Helvetica", 12), padding=10)
+style.configure("TSpinbox", font=("Helvetica", 12))
 
-# Adjusted window dimensions to accommodate all elements
+# Adjusted window dimensions
 window_width = 1100
-window_height = 400
+window_height = 500
 screen_width = root.winfo_screenwidth()
 screen_height = root.winfo_screenheight()
 x = (screen_width / 2) - (window_width / 2)
@@ -131,14 +170,22 @@ selected_device = tk.StringVar(value="Choose")
 device_dropdown_label = ttk.Label(root, text="Select Device:", font=("Helvetica", 14))
 device_dropdown_label.pack(pady=(20, 5))
 
+# Get devices and format them for display
+raw_devices = get_connected_devices()
+formatted_devices = [f"{d[0]} ({d[1]})" for d in raw_devices]
+
 device_dropdown = ttk.Combobox(
-    root, textvariable=selected_device, state="readonly", width=20
+    root, textvariable=selected_device, state="readonly", width=40
 )
-device_dropdown["values"] = (
-    get_connected_devices()
-)
+device_dropdown["values"] = formatted_devices
 device_dropdown.pack(pady=5)
-device_dropdown.bind("<<ComboboxSelected>>", on_device_selected)
+device_dropdown.bind("<<ComboboxSelected>>", on_combobox_select)
+
+# Auto-select first device if available
+if formatted_devices:
+    device_dropdown.current(0)
+    # Manually trigger the selection logic
+    on_combobox_select(None)
 
 # Application Dropdown
 app_label = ttk.Label(root, text="Select Application:", font=("Helvetica", 14))
@@ -162,10 +209,28 @@ app_mode_dropdown["values"] = ("release", "debug")
 app_mode_dropdown.pack(pady=5)
 app_mode_dropdown.bind("<<ComboboxSelected>>", on_build_version_selected)
 
+# Log Interval Input
+log_interval_label = ttk.Label(root, text="Log Interval (s):", font=("Helvetica", 14))
+log_interval_label.pack(pady=(20, 5))
+log_interval_var = tk.StringVar(value=str(DEFAULT_LOG_INTERVAL))
+log_interval_spinbox = ttk.Spinbox(root, from_=1, to=60, textvariable=log_interval_var, width=5, font=("Helvetica", 12))
+log_interval_spinbox.pack(pady=5)
 
 # Task selection area with more organized layout
 task_frame = ttk.Frame(root)
 task_frame.pack(pady=20)
-update_task_buttons()  # Initial population (will be empty)
+update_task_buttons()  # Initial population
 
 root.mainloop()
+
+# --- Post-GUI Execution ---
+if final_task and final_device_code and final_package_name:
+    print(f"Starting execution for {final_task}...")
+    runner.run_automation_tasks(
+        final_internal_name,
+        final_package_name,
+        final_task,
+        final_device_code,
+        final_log_interval,
+        start_activity=final_start_activity,
+    )

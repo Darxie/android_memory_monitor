@@ -1,8 +1,5 @@
-packaging==21.3
+packaging
 uiautomator2
-matplotlib==3.8.4
-seaborn==0.13.0
-pandas==2.2.2
-pyOpenSSL>=0.13
-ndg-httpsclient>=0.3.2
-subprocess
+matplotlib
+seaborn
+pandas
