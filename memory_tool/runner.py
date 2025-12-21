@@ -74,7 +74,7 @@ def run_automation_tasks(app_name_internal, package_name, use_case, device_code,
 
     screenshot_callback = None
     try:
-        shared_module_name = f"memory_tool.use_cases.{app_name_internal}.ew_shared"
+        shared_module_name = f"memory_tool.use_cases.{app_name_internal}.shared"
         shared_module = importlib.import_module(shared_module_name)
         if hasattr(shared_module, "take_about_screenshot"):
             screenshot_callback = shared_module.take_about_screenshot

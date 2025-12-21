@@ -1,6 +1,6 @@
 import time
 import logging
-from . import ew_shared
+from . import shared
 
 
 def run_test(device, memory_tool):
@@ -10,11 +10,11 @@ def run_test(device, memory_tool):
     for i in range(0, 100):
         logging.info(f"Mambo number {i+1}")
         time.sleep(2)
-        ew_shared.tap_search_bar(device)
+        shared.tap_search_bar(device)
         time.sleep(2)
-        ew_shared.set_search_text(device, "station-service u express maraussan")
+        shared.set_search_text(device, "station-service u express maraussan")
         time.sleep(2)
-        ew_shared.select_first_result(device)
+        shared.select_first_result(device)
         time.sleep(1)
         device(text="Get directions").click()
         time.sleep(
