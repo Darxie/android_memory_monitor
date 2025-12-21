@@ -3,9 +3,10 @@ import subprocess
 from pathlib import Path
 import logging
 import time
-from utils import execute_adb_command, _write_to_file, get_app_pid
-from timestamp import ExecutionTimestamp
-import plotter
+from memory_tool.utils import execute_adb_command, _write_to_file, get_app_pid
+from memory_tool.timestamp import ExecutionTimestamp
+from memory_tool import plotter
+
 
 
 timestamp = ExecutionTimestamp.get_timestamp()
@@ -13,7 +14,7 @@ directory = Path(f"output/{timestamp}")
 
 # Construct filenames with the timestamp
 CSV_FILE = directory / f"memory_usage_{timestamp}.csv"
-LOGCAT_FILE = directory / f"logcat_sygic_tag_{timestamp}.txt"
+LOGCAT_FILE = directory / f"logcat_{timestamp}.txt"
 CRASH_LOG_FILE = directory / f"crash_log_{timestamp}.txt"
 
 FATAL_EXCEPTION_LOOKAHEAD = (

@@ -5,7 +5,7 @@ def tap_search_bar(device):
     Args:
         device: The device object representing the Android device.
     """
-    device(resourceId="SearchBar.Input").click()
+    device(resourceId="FreeDrive.SearchBar").click()
 
 def set_search_text(device, input_text):
     """
@@ -15,7 +15,7 @@ def set_search_text(device, input_text):
         device: The device object.
         input_text (str): The text to enter.
     """
-    device(resourceId="com.sygic.profi.beta:id/inputField").set_text(input_text)
+    device(resourceId="com.roadlords.android:id/inputField").set_text(input_text)
 
 def select_first_result(device):
     """
@@ -24,7 +24,8 @@ def select_first_result(device):
     Args:
         device: The device object.
     """
-    device(resourceId="com.sygic.profi.beta:id/recyclerView").child(index=0).click()
+    # Click at center of bounds [0,370][1080,644] -> (540, 507)
+    device.click(540, 507)
 
 def tap_x_button(device):
     """
@@ -33,7 +34,8 @@ def tap_x_button(device):
     Args:
         device: The device object.
     """
-    device.xpath('//*[@resource-id="PoiDetail.Close"]').click()
+    device(resourceId="SearchBar.CloseButton").click()
+
 
 def take_about_screenshot(device, file_path):
     """
@@ -44,15 +46,16 @@ def take_about_screenshot(device, file_path):
         file_path: Path to save the screenshot.
     """
     # Menu - Settings - Info - About
-    device(resourceId="SearchBar.MenuIcon").click()
-    device(resourceId="MainMenu.Settings").click()
-    device(resourceId="Settings.Info").click()
-    device(resourceId="Settings.Info.About").click()
-    device(resourceId="Settings.Info.Product").click()
+    device(resourceId="FreeDrive.Avatar").click()
+    device(text="Settings").click()
+    device(text="Info").click()
+    device(text="About").click()
+    device(text="Product").click()
     # Take screenshot
     device.screenshot(file_path)
     # Get back to map
-    device(resourceId="BackButton").click()
-    device(resourceId="Settings.Back").click()
-    device(resourceId="Settings.Back").click()
-    device(resourceId="MainMenu.Back").click()
+    # Back button is at bounds [19,155][145,281], center (82, 218)
+    device.click(82, 218)
+    device.click(82, 218)
+    device.click(82, 218)
+    device.click(82, 218)

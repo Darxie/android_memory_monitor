@@ -1,7 +1,7 @@
 import subprocess
 import logging
 from pathlib import Path
-from timestamp import ExecutionTimestamp
+from memory_tool.timestamp import ExecutionTimestamp
 
 
 timestamp = ExecutionTimestamp.get_timestamp()
@@ -74,7 +74,7 @@ def get_device_id() -> str:
     exit(1)
 
 
-def print_app_info(device, package_name, use_case):
+def print_app_info(device, package_name, use_case, screenshot_callback=None):
     app_info = device.app_info(package_name)
     device_id = get_device_id()
     pid = get_app_pid(package_name)
@@ -83,7 +83,11 @@ def print_app_info(device, package_name, use_case):
     logging.info(f"Process ID: {pid}")
     logging.info(f"Device ID: {device_id}")
 
-    take_info_about_screenshot(device)
+    if screenshot_callback:
+        try:
+            screenshot_callback(device, JPEG_FILE)
+        except Exception as e:
+            logging.error(f"Failed to take about screenshot: {e}")
 
     _write_to_file(INFO_FILE, f"Use case: {use_case}\n")
     _write_to_file(INFO_FILE, f"Device Info: \n{device.info}\n")
@@ -103,19 +107,3 @@ def _write_to_file(filename, content):
             f.write(content)
     except Exception as e:
         logging.error(f"Error writing to file {filename}: {e}")
-
-
-def take_info_about_screenshot(device):
-    # Menu - Settings - Info - About
-    device(resourceId="SearchBar.MenuIcon").click()
-    device(resourceId="MainMenu.Settings").click()
-    device(resourceId="Settings.Info").click()
-    device(resourceId="Settings.Info.About").click()
-    device(resourceId="Settings.Info.Product").click()
-    # Take screenshot
-    device.screenshot(JPEG_FILE)
-    # Get back to map
-    device(resourceId="BackButton").click()
-    device(resourceId="Settings.Back").click()
-    device(resourceId="Settings.Back").click()
-    device(resourceId="MainMenu.Back").click()

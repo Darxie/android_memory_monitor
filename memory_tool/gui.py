@@ -1,12 +1,12 @@
 import tkinter as tk
 from tkinter import ttk, messagebox
-import runner
+from memory_tool import runner
 from typing import List, Tuple
 import re
 import subprocess
 
 # Import the application configuration
-from config import APPLICATIONS, DEFAULT_LOG_INTERVAL
+from memory_tool.config import APPLICATIONS, DEFAULT_LOG_INTERVAL
 
 # --- Global Variables ---
 selected_device_code = None

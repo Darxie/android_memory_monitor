@@ -1,5 +1,4 @@
 import sys
-import utils
 import shutil
 import logging
 import threading
@@ -7,10 +6,11 @@ import importlib
 import uiautomator2 as u2
 from pathlib import Path
 
-from timestamp import ExecutionTimestamp
-from writer import Writer, directory, CSV_FILE
-from memory_monitor import MemoryTool
-import plotter
+from memory_tool.timestamp import ExecutionTimestamp
+from memory_tool.writer import Writer, directory, CSV_FILE
+from memory_tool.memory_monitor import MemoryTool
+from memory_tool import utils
+from memory_tool import plotter
 
 
 # Set up logging configuration
@@ -72,10 +72,19 @@ def run_automation_tasks(app_name_internal, package_name, use_case, device_code,
     memory_tool = MemoryTool(writer, package_name, device, monitoring_finished_event)
     threading.Thread(target=memory_tool.start_monitoring).start()
 
-    utils.print_app_info(device, package_name, use_case)
+    screenshot_callback = None
+    try:
+        shared_module_name = f"memory_tool.use_cases.{app_name_internal}.ew_shared"
+        shared_module = importlib.import_module(shared_module_name)
+        if hasattr(shared_module, "take_about_screenshot"):
+            screenshot_callback = shared_module.take_about_screenshot
+    except ImportError:
+        logging.debug(f"No shared module found for {app_name_internal}, skipping screenshot callback.")
+
+    utils.print_app_info(device, package_name, use_case, screenshot_callback)
 
     try:
-        module_name = f"use_cases.{app_name_internal}.{use_case}"
+        module_name = f"memory_tool.use_cases.{app_name_internal}.{use_case}"
         logging.info(f"Dynamically loading module: {module_name}")
         use_case_module = importlib.import_module(module_name)
 

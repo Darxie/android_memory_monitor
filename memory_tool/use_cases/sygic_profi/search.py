@@ -12,7 +12,7 @@ def run_test(device, memory_tool):
     """
     Simulate user interactions on the device.
     """
-    for i in range(0, 50):
+    for i in range(0, 100):
         logging.info(f"Mambo number {i+1}")
         shared.tap_search_bar(device)
         time.sleep(1)

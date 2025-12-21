@@ -20,11 +20,11 @@ APPLICATIONS = {
     "EW Navi": {
         "internal_name": "ew_navi",
         "package_name": {
-            "release": "com.roadlods.android",
-            "debug": "com.roadlods.android",
+            "release": "com.roadlords.android",
+            "debug": "com.roadlords.android",
         },
         "start_activity": "com.sygic.profi.platform.splashscreen.feature.ui.main.SplashScreenActivity",
-        "use_cases": ["sample_1", "sample_2"],
+        "use_cases": ["ew_compute", "ew_search"],
     },
 }
 

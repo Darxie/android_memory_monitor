@@ -10,7 +10,7 @@ class MemoryTool:
     """
 
     is_monitoring = False
-    LOG_INTERVAL = 30  # in seconds
+    LOG_INTERVAL = 10  # in seconds
     last_total_memory = 0
     elapsed_time = 0
     check_interval = 5  # in seconds
@@ -61,8 +61,8 @@ class MemoryTool:
         # This regex looks for the TOTAL PSS line.
         total_memory = self.extract_memory_value(r"TOTAL PSS:\s+(\d+)", output)
         if total_memory == "0":
-             # Fallback: sometimes it's just "TOTAL:"
-             total_memory = self.extract_memory_value(r"TOTAL:\s+(\d+)", output)
+            # Fallback: sometimes it's just "TOTAL:"
+            total_memory = self.extract_memory_value(r"TOTAL:\s+(\d+)", output)
 
         self.last_total_memory = int(total_memory)
         

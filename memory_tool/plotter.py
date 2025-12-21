@@ -5,7 +5,7 @@ from pathlib import Path
 import matplotlib.dates as mdates
 import logging
 import numpy as np
-from timestamp import ExecutionTimestamp
+from memory_tool.timestamp import ExecutionTimestamp
 
 
 timestamp = ExecutionTimestamp.get_timestamp()
@@ -129,7 +129,7 @@ def plot_total_memory(csv_file):
     plt.xticks(rotation=45)
     plt.savefig(IMAGE_TOTAL_MEMORY)
     logging.info("\nPlotting total memory data completed.\n\n")
-    plt.show()
+    # plt.show()
 
 
 def plot_memory_data(csv_file):
@@ -182,6 +182,7 @@ def plot_memory_data(csv_file):
 
     plt.savefig(IMAGE_STACKED_MEMORY)
     logging.info("\nPlotting stacked memory data plot completed.\n\n")
-    plt.show()
+    # plt.show()  # Removed to prevent blocking
 
     plot_total_memory(csv_file)
+    analyze_trends(csv_file)
