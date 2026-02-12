@@ -1,133 +1,367 @@
+"""
+Memory data writer module for Android memory monitoring.
+Handles CSV writing, crash detection, and plot generation.
+"""
 import csv
 import subprocess
 from pathlib import Path
 import logging
 import time
+from typing import Optional, List, Tuple
 from memory_tool.utils import execute_adb_command, _write_to_file, get_app_pid
 from memory_tool.timestamp import ExecutionTimestamp
 from memory_tool import plotter
 
+# Constants
+CRASH_LOOKAHEAD_LINES = 50
+CSV_HEADERS = [
+    "timestamp",
+    "total_memory",
+    "java_heap",
+    "native_heap",
+    "code",
+    "stack",
+    "graphics",
+]
+FILE_READABLE_TIMEOUT = 5  # seconds
+LOGCAT_CLEAR_TIMEOUT = 5  # seconds
 
-
-timestamp = ExecutionTimestamp.get_timestamp()
-directory = Path(f"output/{timestamp}")
-
-# Construct filenames with the timestamp
-CSV_FILE = directory / f"memory_usage_{timestamp}.csv"
-LOGCAT_FILE = directory / f"logcat_{timestamp}.txt"
-CRASH_LOG_FILE = directory / f"crash_log_{timestamp}.txt"
-
-FATAL_EXCEPTION_LOOKAHEAD = (
-    10  # Number of lines to look ahead for package name after a FATAL EXCEPTION
-)
-ERROR_SIGNALS = ["FATAL EXCEPTION", "Fatal signal"]
+# Crash detection patterns
+JAVA_CRASH_INDICATORS = ["FATAL EXCEPTION", "java.lang.RuntimeException", "AndroidRuntime"]
+NATIVE_CRASH_INDICATORS = ["Fatal signal", "backtrace:", "SIGSEGV", "SIGABRT"]
 
 
 class Writer:
-    def __init__(self):
-        if not directory.exists():
-            directory.mkdir(parents=True)
-
-        # Initialize CSV file with headers
-        with open(CSV_FILE, mode="w", newline="", encoding="utf-8") as file:
-            writer = csv.writer(file)
-            writer.writerow(
-                [
-                    "timestamp",
-                    "total_memory",
-                    "java_heap",
-                    "native_heap",
-                    "code",
-                    "stack",
-                    "graphics",
-                ]
-            )
-
-    def write_data(
-        self, timestamp, total_memory, java_heap, native_heap, code, stack, graphics
-    ):
-        with open(CSV_FILE, mode="a", newline="", encoding="utf-8") as file:
-            writer = csv.writer(file)
-            writer.writerow(
-                [timestamp, total_memory, java_heap, native_heap, code, stack, graphics]
-            )
-
-    def plot_data_from_csv(self):
-        logging.info("\nPlotting memory data from CSV file...")
-        wait_until_file_is_readable(CSV_FILE)
-        plotter.plot_memory_data(CSV_FILE)
-
-    def _app_crashed(self, logcat_output, package_name):
+    """
+    Handles writing memory data to CSV and capturing crash logs.
+    
+    Attributes:
+        directory: Output directory for test run
+        csv_file: Path to CSV file
+        logcat_file: Path to filtered logcat file
+        crash_log_file: Path to crash log file
+    """
+    
+    def __init__(self, output_dir: Optional[Path] = None):
         """
-        Check if the app crashed by looking for FATAL EXCEPTION related to the package name.
-
-        :param logcat_output: The full logcat output.
-        :param package_name: The app package name.
-        :return: True if crash detected, False otherwise.
-        """
-        lines = logcat_output.splitlines()
-        lookahead = 50  # Increased lookahead to catch the process name in stack traces
+        Initialize CSV file with headers.
         
-        for i, line in enumerate(lines):
-            # 1. Java Crash Detection
-            if "FATAL EXCEPTION" in line:
-                # Look for "Process: com.example.package" which is standard in AndroidRuntime logs
-                # Or check if the package name appears in the stack trace lines immediately following
-                for j in range(i, min(i + lookahead, len(lines))):
-                    if f"Process: {package_name}" in lines[j]:
-                        return True
-                    if package_name in lines[j]:
-                        return True
-
-            # 2. Native Crash Detection
-            if "Fatal signal" in line:
-                # Native crashes (tombstones) usually print: 
-                # "pid: 1234, tid: 5678, name: ThreadName  >>> com.example.package <<<"
-                for j in range(i, min(i + lookahead, len(lines))):
-                    if f">>> {package_name} <<<" in lines[j]:
-                        return True
-                    
-        return False
-
-    def capture_app_log(self, package_name):
-        logcat_output = execute_adb_command(["adb", "logcat", "-d"])
-
-        if self._app_crashed(logcat_output, package_name):
-            logging.warning("The app seems to have crashed. Capturing full logs.")
-            _write_to_file(CRASH_LOG_FILE, logcat_output)
-            logging.info("crash check returned true - app crashed")
-            return True
+        Args:
+            output_dir: Optional custom output directory. If None, uses default timestamped directory.
+        """
+        timestamp = ExecutionTimestamp.get_timestamp()
+        
+        if output_dir:
+            self.directory = output_dir
         else:
-            # Filter logs by PID
-            pid = get_app_pid(package_name)
-            if pid and pid != "None":
-                # Filter lines containing the PID (surrounded by spaces or followed by colon)
-                # This helps avoid matching similar numbers in timestamps etc.
-                filtered_logs = [
-                    line for line in logcat_output.splitlines() 
-                    if f" {pid} " in line or f"{pid}:" in line
-                ]
-                if filtered_logs:
-                    _write_to_file(LOGCAT_FILE, "\n".join(filtered_logs) + "\n")
+            self.directory = Path(f"output/{timestamp}")
+        
+        # Ensure directory exists
+        self.directory.mkdir(parents=True, exist_ok=True)
+        
+        # Set file paths
+        self.csv_file = self.directory / f"memory_usage_{timestamp}.csv"
+        self.logcat_file = self.directory / f"logcat_{timestamp}.txt"
+        self.crash_log_file = self.directory / f"crash_log_{timestamp}.txt"
+        
+        # Statistics tracking
+        self.rows_written = 0
+        self.write_errors = 0
+        self.crash_checks = 0
+        self.crashes_detected = 0
+        
+        # Initialize CSV
+        self._initialize_csv()
+    
+    def _initialize_csv(self) -> None:
+        """Initialize CSV file with headers."""
+        try:
+            with open(self.csv_file, mode="w", newline="", encoding="utf-8") as file:
+                csv_writer = csv.writer(file)
+                csv_writer.writerow(CSV_HEADERS)
+            logging.info(f"CSV initialized: {self.csv_file}")
+        except Exception as e:
+            logging.error(f"Failed to initialize CSV: {e}")
+            raise
+    
+    def _validate_memory_data(self, data: Tuple[int, ...]) -> bool:
+        """
+        Validate memory data before writing.
+        
+        Args:
+            data: Tuple of memory values
             
-            subprocess.run(["adb", "logcat", "-c"])
+        Returns:
+            True if valid, False otherwise
+        """
+        if len(data) != len(CSV_HEADERS):
+            logging.warning(f"Invalid data length: {len(data)} vs {len(CSV_HEADERS)}")
+            return False
+        
+        # Check that timestamp is reasonable
+        if data[0] < 1000000000:  # Before year 2001
+            logging.warning(f"Invalid timestamp: {data[0]}")
+            return False
+        
+        return True
+
+    def write_data(self, timestamp: int, total_memory: int, java_heap: int, 
+                   native_heap: int, code: int, stack: int, graphics: int) -> bool:
+        """
+        Write memory data row to CSV file.
+        
+        Args:
+            timestamp: Unix timestamp
+            total_memory: Total memory in KB
+            java_heap: Java heap in KB
+            native_heap: Native heap in KB
+            code: Code memory in KB
+            stack: Stack memory in KB
+            graphics: Graphics memory in KB
+            
+        Returns:
+            True if write successful, False otherwise
+        """
+        data = (timestamp, total_memory, java_heap, native_heap, code, stack, graphics)
+        
+        if not self._validate_memory_data(data):
+            self.write_errors += 1
+            return False
+        
+        try:
+            with open(self.csv_file, mode="a", newline="", encoding="utf-8") as file:
+                csv_writer = csv.writer(file)
+                csv_writer.writerow(data)
+            self.rows_written += 1
+            return True
+        except Exception as e:
+            logging.error(f"Failed to write data to CSV: {e}")
+            self.write_errors += 1
             return False
 
-
-def wait_until_file_is_readable(path, timeout=5):
-    """Wait until the file can be opened for reading."""
-    path_obj = Path(path)
-    if not path_obj.exists():
-        raise FileNotFoundError(f"File {path} does not exist.")
-
-    start_time = time.time()
-    while True:
+    def plot_data_from_csv(self) -> bool:
+        """
+        Generate plots from CSV data.
+        
+        Returns:
+            True if successful, False otherwise
+        """
         try:
-            with open(path, "r", encoding="utf-8"):
-                return  # File is ready
-        except (PermissionError, OSError):
-            if time.time() - start_time > timeout:
-                raise TimeoutError(
-                    f"File {path} is still locked after {timeout} seconds."
-                )
-            time.sleep(0.1)
+            if not self.csv_file.exists():
+                logging.error(f"CSV file not found: {self.csv_file}")
+                return False
+            
+            logging.info("Generating plots from memory data...")
+            self._wait_until_file_is_readable(self.csv_file)
+            plotter.plot_memory_data(str(self.csv_file))
+            logging.info("Plot generation completed")
+            return True
+        except Exception as e:
+            logging.error(f"Failed to plot data: {e}", exc_info=True)
+            return False
+    
+    def _wait_until_file_is_readable(self, path: Path, timeout: int = FILE_READABLE_TIMEOUT) -> None:
+        """
+        Wait for file to become readable.
+        
+        Args:
+            path: File path
+            timeout: Timeout in seconds
+            
+        Raises:
+            FileNotFoundError: If file doesn't exist
+            TimeoutError: If file remains locked after timeout
+        """
+        if not path.exists():
+            raise FileNotFoundError(f"File not found: {path}")
+
+        start_time = time.time()
+        while True:
+            try:
+                with open(path, "r", encoding="utf-8") as f:
+                    f.read(1)  # Try to read one byte
+                return  # File is readable
+            except (PermissionError, OSError) as e:
+                if time.time() - start_time > timeout:
+                    raise TimeoutError(f"File locked after {timeout}s: {path}")
+                time.sleep(0.1)
+
+    def _detect_java_crash(self, lines: List[str], package_name: str, start_idx: int) -> bool:
+        """
+        Detect Java/Android runtime crashes.
+        
+        Args:
+            lines: Logcat lines
+            package_name: Package to check for
+            start_idx: Starting index in lines
+            
+        Returns:
+            True if Java crash detected for this package
+        """
+        end_idx = min(start_idx + CRASH_LOOKAHEAD_LINES, len(lines))
+        
+        for j in range(start_idx, end_idx):
+            line = lines[j]
+            # Look for explicit process marker
+            if f"Process: {package_name}" in line:
+                return True
+            # Check for package in stack trace
+            if package_name in line and ("at " in line or "Caused by:" in line):
+                return True
+        
+        return False
+    
+    def _detect_native_crash(self, lines: List[str], package_name: str, start_idx: int) -> bool:
+        """
+        Detect native/signal crashes.
+        
+        Args:
+            lines: Logcat lines
+            package_name: Package to check for
+            start_idx: Starting index in lines
+            
+        Returns:
+            True if native crash detected for this package
+        """
+        end_idx = min(start_idx + CRASH_LOOKAHEAD_LINES, len(lines))
+        
+        for j in range(start_idx, end_idx):
+            if f">>> {package_name} <<<" in lines[j]:
+                return True
+        
+        return False
+    def _app_crashed(self, logcat_output: str, package_name: str) -> bool:
+        """
+        Check if the app crashed using logcat output.
+        
+        Args:
+            logcat_output: Full logcat output
+            package_name: Package name to match against
+            
+        Returns:
+            True if crash detected, False otherwise
+        """
+        if not logcat_output:
+            return False
+            
+        lines = logcat_output.splitlines()
+        
+        for i, line in enumerate(lines):
+            # Check for Java crashes
+            if any(indicator in line for indicator in JAVA_CRASH_INDICATORS):
+                if self._detect_java_crash(lines, package_name, i):
+                    logging.warning(f"Java crash detected at line {i}")
+                    return True
+            
+            # Check for native crashes
+            if any(indicator in line for indicator in NATIVE_CRASH_INDICATORS):
+                if self._detect_native_crash(lines, package_name, i):
+                    logging.warning(f"Native crash detected at line {i}")
+                    return True
+        
+        return False
+
+    def _filter_logs_by_pid(self, logcat_output: str, pid: str) -> List[str]:
+        """
+        Filter logcat output by process ID.
+        
+        Args:
+            logcat_output: Full logcat output
+            pid: Process ID to filter by
+            
+        Returns:
+            List of filtered log lines
+        """
+        if not pid or pid == "None":
+            return []
+        
+        # Filter lines containing the PID
+        filtered_logs = [
+            line for line in logcat_output.splitlines()
+            if f" {pid} " in line or f"{pid}:" in line or f"({pid})" in line
+        ]
+        
+        return filtered_logs
+    
+    def capture_app_log(self, package_name: str) -> bool:
+        """
+        Capture application logs and check for crashes.
+        
+        Args:
+            package_name: Package name to capture logs for
+            
+        Returns:
+            True if crash detected, False otherwise
+        """
+        self.crash_checks += 1
+        
+        try:
+            logcat_output = execute_adb_command(["adb", "logcat", "-d"])
+            
+            if not logcat_output:
+                logging.debug("Empty logcat output received")
+                return False
+
+            # Check for crashes
+            if self._app_crashed(logcat_output, package_name):
+                self.crashes_detected += 1
+                logging.warning(f"Crash detected in {package_name}. Saving crash logs.")
+                _write_to_file(self.crash_log_file, logcat_output)
+                return True
+            
+            # Save filtered logs by PID
+            pid = get_app_pid(package_name)
+            filtered_logs = self._filter_logs_by_pid(logcat_output, pid)
+            
+            if filtered_logs:
+                log_content = "\n".join(filtered_logs) + "\n"
+                _write_to_file(self.logcat_file, log_content)
+                logging.debug(f"Captured {len(filtered_logs)} log lines for PID {pid}")
+
+            # Clear logcat buffer
+            subprocess.run(
+                ["adb", "logcat", "-c"],
+                check=False,
+                timeout=LOGCAT_CLEAR_TIMEOUT,
+                capture_output=True
+            )
+            return False
+                
+        except subprocess.TimeoutExpired:
+            logging.error("Logcat clear command timed out")
+            return False
+        except Exception as e:
+            logging.error(f"Error capturing app log: {e}", exc_info=True)
+            return False
+    
+    def get_output_directory(self) -> Path:
+        """Get the output directory path."""
+        return self.directory
+    
+    def get_csv_file(self) -> Path:
+        """Get the CSV file path."""
+        return self.csv_file
+    
+    def get_statistics(self) -> dict:
+        """
+        Get writer statistics.
+        
+        Returns:
+            Dictionary with statistics
+        """
+        return {
+            'rows_written': self.rows_written,
+            'write_errors': self.write_errors,
+            'crash_checks': self.crash_checks,
+            'crashes_detected': self.crashes_detected,
+            'csv_file': str(self.csv_file),
+            'output_directory': str(self.directory),
+        }
+
+
+# Maintain backward compatibility
+timestamp = ExecutionTimestamp.get_timestamp()
+directory = Path(f"output/{timestamp}")
+CSV_FILE = directory / f"memory_usage_{timestamp}.csv"
+LOGCAT_FILE = directory / f"logcat_{timestamp}.txt"
+CRASH_LOG_FILE = directory / f"crash_log_{timestamp}.txt"
