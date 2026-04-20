@@ -7,7 +7,7 @@ import subprocess
 from pathlib import Path
 import logging
 import time
-from typing import Optional, List, Tuple
+from typing import Optional, List, Tuple, Union
 from memory_tool.utils import execute_adb_command, _write_to_file, get_app_pid
 from memory_tool.timestamp import ExecutionTimestamp
 from memory_tool import plotter
@@ -22,6 +22,7 @@ CSV_HEADERS = [
     "code",
     "stack",
     "graphics",
+    "cpu_usage",
 ]
 FILE_READABLE_TIMEOUT = 5  # seconds
 LOGCAT_CLEAR_TIMEOUT = 5  # seconds
@@ -63,6 +64,7 @@ class Writer:
         self.csv_file = self.directory / f"memory_usage_{timestamp}.csv"
         self.logcat_file = self.directory / f"logcat_{timestamp}.txt"
         self.crash_log_file = self.directory / f"crash_log_{timestamp}.txt"
+        self.cpu_info_file = self.directory / f"cpu_info_{timestamp}.txt"
         
         # Statistics tracking
         self.rows_written = 0
@@ -84,7 +86,7 @@ class Writer:
             logging.error(f"Failed to initialize CSV: {e}")
             raise
     
-    def _validate_memory_data(self, data: Tuple[int, ...]) -> bool:
+    def _validate_memory_data(self, data: Tuple[Union[int, float], ...]) -> bool:
         """
         Validate memory data before writing.
         
@@ -105,8 +107,17 @@ class Writer:
         
         return True
 
-    def write_data(self, timestamp: int, total_memory: int, java_heap: int, 
-                   native_heap: int, code: int, stack: int, graphics: int) -> bool:
+    def write_data(
+        self,
+        timestamp: int,
+        total_memory: int,
+        java_heap: int,
+        native_heap: int,
+        code: int,
+        stack: int,
+        graphics: int,
+        cpu_usage: float = 0.0,
+    ) -> bool:
         """
         Write memory data row to CSV file.
         
@@ -118,11 +129,12 @@ class Writer:
             code: Code memory in KB
             stack: Stack memory in KB
             graphics: Graphics memory in KB
+            cpu_usage: CPU usage in percent for monitored process
             
         Returns:
             True if write successful, False otherwise
         """
-        data = (timestamp, total_memory, java_heap, native_heap, code, stack, graphics)
+        data = (timestamp, total_memory, java_heap, native_heap, code, stack, graphics, cpu_usage)
         
         if not self._validate_memory_data(data):
             self.write_errors += 1
@@ -158,6 +170,36 @@ class Writer:
             return True
         except Exception as e:
             logging.error(f"Failed to plot data: {e}", exc_info=True)
+            return False
+
+    def write_cpu_info(self, cpu_cores: int) -> bool:
+        """
+        Write CPU core context to output so CPU percentages are easier to interpret.
+
+        Args:
+            cpu_cores: Number of logical CPU cores on the device
+
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            max_percent = max(cpu_cores, 1) * 100
+            info_lines = [
+                "CPU INTERPRETATION INFO",
+                "======================",
+                f"Detected logical CPU cores: {cpu_cores}",
+                "",
+                "Why values above 100% are possible:",
+                "- Android cpuinfo percentage for an app is aggregated across CPU cores.",
+                "- 100% means roughly one fully utilized core.",
+                f"- On this device, theoretical app maximum is about {max_percent}%.",
+                "- Example: 160% means approximately 1.6 cores worth of CPU time, which is normal.",
+            ]
+            self.cpu_info_file.write_text("\n".join(info_lines) + "\n", encoding="utf-8")
+            logging.info(f"CPU info written: {self.cpu_info_file}")
+            return True
+        except Exception as e:
+            logging.error(f"Failed to write CPU info: {e}", exc_info=True)
             return False
     
     def _wait_until_file_is_readable(self, path: Path, timeout: int = FILE_READABLE_TIMEOUT) -> None:
@@ -355,6 +397,7 @@ class Writer:
             'crash_checks': self.crash_checks,
             'crashes_detected': self.crashes_detected,
             'csv_file': str(self.csv_file),
+            'cpu_info_file': str(self.cpu_info_file),
             'output_directory': str(self.directory),
         }
 
