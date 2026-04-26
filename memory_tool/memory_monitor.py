@@ -1,111 +1,305 @@
+"""
+Memory monitoring module for Android applications.
+Provides real-time memory tracking with crash detection.
+"""
 import time
 import logging
-import utils
+import re
+from typing import Optional, Dict, Tuple
+from threading import Event
+from memory_tool.adb import get_app_pid, AdbDevice
+
+# Configuration constants
+DEFAULT_LOG_INTERVAL = 30  # seconds
+CHECK_INTERVAL = 5  # seconds between crash checks
+
+# Memory extraction patterns
+MEMORY_PATTERNS = {
+    'total_pss': r"TOTAL PSS:\s+(\d+)",
+    'total': r"TOTAL:\s+(\d+)",
+    'java_heap': r"Java Heap:\s+(\d+)",
+    'native_heap': r"Native Heap:\s+(\d+)",
+    'code': r"Code:\s+(\d+)",
+    'stack': r"Stack:\s+(\d+)",
+    'graphics': r"Graphics:\s+(\d+)",
+}
+
+CPU_PATTERNS = [
+    r"\b([0-9]+(?:\.[0-9]+)?)%\s+\d+\/",  # e.g. "12.3% 1234/com.package"
+    r"\b([0-9]+(?:\.[0-9]+)?)%\s+"         # fallback for varying output formats
+]
 
 
 class MemoryTool:
     """
-    A class that provides functionality to monitor memory usage of an Android app.
-
+    Monitors memory usage of an Android app using uiautomator2.
+    
+    Attributes:
+        package_name: Android package name to monitor
+        device: uiautomator2 device instance
+        writer: Writer instance for data output
+        log_interval: Seconds between memory checks
+        check_interval: Seconds between crash checks
     """
 
-    is_monitoring = False
-    LOG_INTERVAL = 30  # in seconds
-    last_total_memory = 0
-    last_timestamp = 0
-    elapsed_time = 0
-    check_interval = 5 # in seconds
-
     def __init__(
-        self, writer, package_name, monitoring_finished_event=None
+        self,
+        writer,
+        package_name: str,
+        device,
+        monitoring_finished_event: Optional[Event] = None,
+        log_interval: int = DEFAULT_LOG_INTERVAL,
+        dry_run: bool = False,
     ):
         self.writer = writer
         self.package_name = package_name
+        self.device = device
+        self.adb = AdbDevice(device.serial)
         self.monitoring_finished_event = monitoring_finished_event
+        self.log_interval = log_interval
+        self.check_interval = CHECK_INTERVAL
+        self.dry_run = dry_run
+        
+        # State tracking
+        self.is_monitoring = False
+        self.last_total_memory = 0
+        self.elapsed_time = 0
+        self.data_points_collected = 0
+        self.last_cpu_usage = 0.0
+        self.cpu_cores = 1
+        self._last_cpu_sample: Optional[Tuple[int, int]] = None
 
     @staticmethod
-    def extract_memory_info(label, data) -> str:
+    def extract_memory_value(pattern: str, data: str) -> int:
         """
-        Extracts memory information from the given data based on the provided label.
-
+        Extract a memory value using regex from the data string.
+        
         Args:
-            label (str): The label to search for in the data.
-            data (List[str]): The list of strings containing memory information.
-
+            pattern: Regex pattern to match
+            data: Data string to search in
+            
         Returns:
-            str: The extracted memory information as a string.
+            Memory value in KB, or 0 if not found
         """
-        found_app_summary = False
-        for line in data:
-            if "App Summary" in line:
-                found_app_summary = True
-                continue
-            if found_app_summary:
-                if label in line:
-                    if label == "TOTAL PSS":
-                        return line.split()[2]
-                    if label in ["Code:", "Stack:", "Graphics:"]:
-                        return line.split()[1]
-                    return line.split()[2]
-        return "NA"
+        try:
+            match = re.search(pattern, data)
+            if match:
+                return int(match.group(1))
+        except (ValueError, AttributeError, IndexError):
+            pass
+        return 0
 
-    def check_for_crashes(self):
-        # capture_sygic_log returns True if app crashed
-        return self.writer.capture_sygic_log(self.package_name)
-
-    def process_meminfo(self):
+    def check_for_crashes(self) -> bool:
         """
-        Extracts memory information using adb shell dumpsys meminfo command
-        and writes it to a file.
+        Check if the app crashed by analyzing logs.
+        
+        Returns:
+            True if crash detected, False otherwise
+        """
+        return self.writer.capture_app_log(self.package_name)
+
+    def process_meminfo(self) -> bool:
+        """
+        Extract memory information using dumpsys meminfo and write to CSV.
+        
+        Returns:
+            True if successful, False otherwise
         """
         timestamp = int(time.time())
-        result = utils.execute_adb_command(
-            ["adb", "shell", "dumpsys", "meminfo", self.package_name]
-        )
+        try:
+            output = self.device.shell(f"dumpsys meminfo {self.package_name}").output
+            if not output:
+                logging.warning("Empty dumpsys output received")
+                return False
+        except Exception as e:
+            logging.error(f"Failed to get meminfo: {e}")
+            return False
 
-        data_lines = result.split("\n")
-        total_memory = self.extract_memory_info("TOTAL PSS", data_lines)
-        self.last_total_memory = int(total_memory)
-        java_heap = self.extract_memory_info("Java Heap:", data_lines)
-        native_heap = self.extract_memory_info("Native Heap:", data_lines)
-        code = self.extract_memory_info("Code:", data_lines)
-        stack = self.extract_memory_info("Stack:", data_lines)
-        graphics = self.extract_memory_info("Graphics:", data_lines)
+        # Extract total memory with fallback
+        total_memory = self.extract_memory_value(MEMORY_PATTERNS['total_pss'], output)
+        if total_memory == 0:
+            total_memory = self.extract_memory_value(MEMORY_PATTERNS['total'], output)
+        
+        if total_memory == 0:
+            logging.warning("Could not extract total memory from dumpsys")
+            return False
 
-        self.writer.write_data(
-            timestamp, total_memory, java_heap, native_heap, code, stack, graphics
+        self.last_total_memory = total_memory
+        
+        # Extract memory components
+        java_heap = self.extract_memory_value(MEMORY_PATTERNS['java_heap'], output)
+        native_heap = self.extract_memory_value(MEMORY_PATTERNS['native_heap'], output)
+        code = self.extract_memory_value(MEMORY_PATTERNS['code'], output)
+        stack = self.extract_memory_value(MEMORY_PATTERNS['stack'], output)
+        graphics = self.extract_memory_value(MEMORY_PATTERNS['graphics'], output)
+
+        cpu_usage = self.process_cpuinfo()
+
+        success = self.writer.write_data(
+            timestamp, total_memory, java_heap, native_heap, code, stack, graphics, cpu_usage
         )
+        
+        if success:
+            self.data_points_collected += 1
+            self.last_cpu_usage = cpu_usage
+        
+        return success
+
+    def process_cpuinfo(self) -> float:
+        """
+        Extract app CPU usage percentage for current process.
+
+        Returns:
+            CPU usage percent as float, 0.0 if unavailable
+        """
+        # Primary method: /proc deltas per PID for stable and time-local readings.
+        pid = get_app_pid(self.package_name, self.adb)
+        if pid and pid != "None":
+            cpu_value = self._read_cpu_from_proc(pid)
+            if cpu_value is not None:
+                return cpu_value
+
+        # Fallback: parse dumpsys cpuinfo output.
+        try:
+            output = self.device.shell("dumpsys cpuinfo").output
+            if not output:
+                return 0.0
+
+            for line in output.splitlines():
+                if self.package_name not in line:
+                    continue
+
+                for pattern in CPU_PATTERNS:
+                    match = re.search(pattern, line)
+                    if match:
+                        return float(match.group(1))
+        except Exception as e:
+            logging.debug(f"Failed to extract CPU usage: {e}")
+
+        return 0.0
+
+    def _read_cpu_from_proc(self, pid: str) -> Optional[float]:
+        """
+        Compute per-app CPU percentage from /proc deltas.
+
+        Returns:
+            CPU percent where 100% ~= one fully utilized core, or None if unavailable.
+        """
+        try:
+            proc_stat = self.device.shell(f"cat /proc/{pid}/stat").output.strip()
+            if not proc_stat:
+                return None
+
+            end = proc_stat.rfind(")")
+            if end == -1:
+                return None
+
+            after = proc_stat[end + 1 :].strip().split()
+            if len(after) < 15:
+                return None
+
+            utime = int(after[11])
+            stime = int(after[12])
+            proc_jiffies = utime + stime
+
+            cpu_stat = self.device.shell("cat /proc/stat").output
+            total_line = next((line for line in cpu_stat.splitlines() if line.startswith("cpu ")), "")
+            if not total_line:
+                return None
+
+            total_parts = total_line.split()[1:]
+            total_jiffies = sum(int(x) for x in total_parts if x.isdigit())
+
+            if self._last_cpu_sample is None:
+                self._last_cpu_sample = (proc_jiffies, total_jiffies)
+                return 0.0
+
+            last_proc, last_total = self._last_cpu_sample
+            delta_proc = proc_jiffies - last_proc
+            delta_total = total_jiffies - last_total
+            self._last_cpu_sample = (proc_jiffies, total_jiffies)
+
+            if delta_total <= 0 or delta_proc < 0:
+                return 0.0
+
+            cpu_percent_total = (delta_proc / delta_total) * 100.0
+            cpu_percent_one_core_scale = cpu_percent_total * max(self.cpu_cores, 1)
+            return max(0.0, cpu_percent_one_core_scale)
+        except Exception:
+            return None
+
+    def get_cpu_core_count(self) -> int:
+        """
+        Detect logical CPU core count on the connected Android device.
+
+        Returns:
+            Logical core count, defaults to 1 if detection fails
+        """
+        commands = [
+            "getconf _NPROCESSORS_ONLN",
+            "nproc",
+            "cat /sys/devices/system/cpu/possible",
+        ]
+
+        for command in commands:
+            try:
+                output = self.device.shell(command).output.strip()
+                if not output:
+                    continue
+
+                if "-" in output:
+                    parts = output.split("-")
+                    if len(parts) == 2 and parts[0].isdigit() and parts[1].isdigit():
+                        return int(parts[1]) - int(parts[0]) + 1
+
+                match = re.search(r"(\d+)", output)
+                if match:
+                    value = int(match.group(1))
+                    if value > 0:
+                        return value
+            except Exception:
+                continue
+
+        return 1
 
     def start_monitoring(self):
-        """
-        Starts monitoring the memory usage of the specified package.
-        """
+        """Start monitoring the memory usage of the specified package."""
         self.is_monitoring = True
+        logging.info(f"Starting memory monitoring for {self.package_name}")
+
+        # Clear old logs so crash detection is based only on this run.
+        self.adb.logcat_clear()
+        logging.info("Logcat cleared before monitoring start")
+
+        self.cpu_cores = self.get_cpu_core_count()
+        self.writer.write_cpu_info(self.cpu_cores)
+        logging.info(f"Detected logical CPU cores: {self.cpu_cores}")
+        
         try:
             while self.is_monitoring:
-                if self.elapsed_time % self.LOG_INTERVAL == 0:
+                if self.elapsed_time % self.log_interval == 0:
                     self.process_meminfo()
+                    memory_mb = self.last_total_memory / 1024
                     logging.info(
-                        f" Monitoring in progress... (Total Memory: {self.last_total_memory/1024}MB)"
+                        f"Monitoring... Memory: {memory_mb:.2f}MB, CPU: {self.last_cpu_usage:.2f}%"
                     )
 
                 if self.check_for_crashes():
+                    logging.warning("App crash detected, stopping monitor")
                     self.stop_monitoring()
+                    
                 time.sleep(self.check_interval)
                 self.elapsed_time += self.check_interval
 
         except Exception as e:
-            logging.error(f"Error during memory monitoring: {e}")
-
+            logging.error(f"Error during memory monitoring: {e}", exc_info=True)
         finally:
-            self.stop_monitoring()
-
+            self.is_monitoring = False
+            if self.monitoring_finished_event:
+                self.monitoring_finished_event.set()
+            logging.info(f"Monitoring stopped. Duration: {self.elapsed_time}s, Data points: {self.data_points_collected}")
+    
     def stop_monitoring(self):
-        """
-        Stops the memory monitoring process and logs the elapsed time.
-        """
+        """Stop the monitoring thread."""
         self.is_monitoring = False
-        logging.info("Elapsed time: " + str(self.elapsed_time) + " seconds.")
-        if self.monitoring_finished_event:
-            self.monitoring_finished_event.set()
-        logging.info("Memory monitoring has been stopped.")
+    

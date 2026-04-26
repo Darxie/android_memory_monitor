@@ -1,0 +1,21 @@
+{
+  "compute": {
+    "maps": "Slovakia, Austria",
+    "description": "Searches for \"Lagerhaus Tamsweg\" and computes a route. Waits 15 seconds, then presses the back button to return to the map.\n\nRepeats 100×."
+  },
+  "search": {
+    "maps": "Slovakia, South Carolina, Singapore, Italy",
+    "description": "Searches for \"market horlbeck\" (Charleston), \"kam kreta ayer\" (Singapore) and \"duomo di milano\" (Milan), each time selecting the first result and tapping X to return to typing.\n\nRepeats 100×."
+  },
+  "fg_bg": {
+    "description": "Opens com.google.android.calendar via `adb shell monkey`, sleeps for 25 seconds, then brings com.sygic.profi.beta back to the foreground via `adb shell am start ... NaviNativeActivity`.\n\nRepeats 100×."
+  },
+  "zoom": {
+    "maps": "Nepal",
+    "description": "Searches for 27°55'40.5\"N 86°53'07.5\"E (Mount Everest), taps the result, then opens the zoom controls. Zooms out 20×, then zooms back in 20×.\n\nRepeats the zoom sequence 100×."
+  },
+  "demonstrate": {
+    "maps": "Slovakia, Austria, Germany",
+    "description": "Searches for coordinates near Düsseldorf (Germany), computes a long route, presses Demonstrate route, and lets the simulated drive run for a fixed duration before cancelling."
+  }
+}

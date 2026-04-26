@@ -1,0 +1,162 @@
+:root {
+  --bg: #f4f5f7;
+  --card: #ffffff;
+  --ink: #16212b;
+  --muted: #5b6b78;
+  --line: #d8dde5;
+  --accent: #0f766e;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: "Segoe UI", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  color: var(--ink);
+  background: linear-gradient(165deg, #e8f0e2 0%, var(--bg) 40%, #f7efe1 100%);
+  min-height: 100vh;
+}
+
+.wrap {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+header {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 18px 22px;
+  margin-bottom: 16px;
+}
+
+h1 {
+  margin: 0 0 6px;
+  font-size: 1.55rem;
+}
+
+.meta {
+  margin: 0;
+  color: var(--muted);
+}
+
+.maps-overview {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 14px 20px;
+  margin-bottom: 16px;
+}
+
+.maps-overview h2 {
+  margin: 0 0 6px;
+  color: var(--accent);
+  font-size: 1.1rem;
+}
+
+.maps-overview .all-maps {
+  margin: 0 0 4px;
+  font-weight: 500;
+  color: var(--ink);
+}
+
+.maps-overview details {
+  margin-top: 8px;
+}
+
+.maps-overview summary {
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 0.9rem;
+  padding: 4px 0;
+}
+
+.maps-overview ul {
+  margin: 8px 0 0;
+  padding-left: 20px;
+  font-size: 0.93rem;
+  color: var(--ink);
+}
+
+.maps-overview ul li {
+  margin: 3px 0;
+}
+
+.maps-overview ul li strong {
+  text-transform: capitalize;
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.chart-card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 16px 18px 12px;
+  margin-bottom: 16px;
+}
+
+.chart-card h2 {
+  margin: 0 0 6px;
+  color: var(--accent);
+  font-size: 1.15rem;
+  text-transform: capitalize;
+}
+
+.chart-card .description {
+  background: #f7f9fb;
+  border: 1px solid #e3e6ec;
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin: 0 0 12px;
+  font-size: 0.93rem;
+  line-height: 1.5;
+  color: #2c3742;
+}
+
+.chart-card .description p {
+  margin: 0 0 6px;
+}
+
+.chart-card .description p:last-child {
+  margin: 0;
+}
+
+.chart-card .description .maps {
+  margin: 0 0 8px;
+  font-size: 0.78rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.chart-card .description .maps strong {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.chart-card .sdks {
+  margin: 0 0 12px;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.plotly-target {
+  width: 100%;
+  height: 460px;
+}
+
+.empty {
+  background: var(--card);
+  border: 1px dashed var(--line);
+  border-radius: 14px;
+  padding: 28px;
+  text-align: center;
+  color: var(--muted);
+}
+
+.empty h2 {
+  color: var(--ink);
+  margin: 0 0 6px;
+}

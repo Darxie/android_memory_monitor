@@ -1,14 +1,14 @@
 import time
 import logging
 import threading
-import utils
+from . import shared
 
 """
 NECESSARY MAPS - Slovakia, Austria, Italy
 """
 
 
-def simulate_user_interactions(device, memory_tool):
+def run_test(device, memory_tool):
     """
     Simulate user interactions on the device.
     """
@@ -21,7 +21,7 @@ def simulate_user_interactions(device, memory_tool):
     stop_timer.start()  # Start the timer
 
     time.sleep(2)
-    tap_search_bar(device)
+    shared.tap_search_bar(device)
     time.sleep(2)
     device(focused=True).set_text("37.798910869409795, 12.439788716063287")
     time.sleep(4)
@@ -47,27 +47,12 @@ def simulate_user_interactions(device, memory_tool):
             break  # Exit the loop if the stop_event is set
         logging.info(f"Mambo number {i+1}")
         time.sleep(10)
-        utils.execute_adb_command(
-            [
-                "adb",
-                "shell",
-                "monkey",
-                "-p ",
-                "com.google.android.calendar",
-                "1",
-            ],
-        )
+        memory_tool.adb.shell("monkey", "-p", "com.google.android.calendar", "1")
         logging.info("switched to calendar")
         time.sleep(10)
-        utils.execute_adb_command(
-            [
-                "adb",
-                "shell",
-                "am",
-                "start",
-                "-n",
-                "com.sygic.profi.beta/com.sygic.profi.platform.splashscreen.feature.ui.main.SplashScreenActivity",
-            ]
+        memory_tool.adb.shell(
+            "am", "start", "-n",
+            "com.sygic.profi.beta/com.sygic.profi.platform.splashscreen.feature.ui.main.SplashScreenActivity",
         )
         logging.info("switched to profi navi")
 
@@ -86,18 +71,3 @@ def stop_demonstrate(device, memory_tool, stop_event):
     """
     stop_event.set()
     memory_tool.stop_monitoring()
-
-
-def tap_search_bar(device):
-    """
-    Taps on the search bar of the Sygic app.
-
-    Args:
-        device: The device object representing the Android device.
-
-    Returns:
-        None
-    """
-    device.xpath(
-        '//*[@resource-id="com.sygic.profi.beta:id/composeView_searchBar"]/android.view.View[1]/android.view.View[1]'
-    ).click()

@@ -1,0 +1,31 @@
+import time
+import logging
+from . import shared
+
+
+def run_test(device, memory_tool):
+    """
+    Simulate user interactions on the device.
+    """
+    for i in range(0, 50):
+        logging.info(f"Mambo number {i+1}")
+        shared.tap_search_bar(device)
+        time.sleep(1)
+        shared.set_search_text(device, "bezier apartments")
+        time.sleep(1)
+        shared.select_first_result(device)
+        time.sleep(3)
+        shared.tap_x_button(device)
+        shared.tap_search_bar(device)
+        shared.set_search_text(device, "plaza de san nicolás")
+        time.sleep(1)
+        shared.select_first_result(device)
+        time.sleep(3)
+        shared.tap_x_button(device)
+        shared.tap_search_bar(device)
+        shared.set_search_text(device, "duomo di milano")
+        time.sleep(1)
+        shared.select_first_result(device)
+        time.sleep(3)
+        shared.tap_x_button(device)
+    memory_tool.stop_monitoring()
