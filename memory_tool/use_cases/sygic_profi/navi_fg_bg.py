@@ -40,7 +40,7 @@ def run_test(device, memory_tool):
 
     time.sleep(3)
 
-    
+
 
     for i in range(0, 1800):
         if stop_event.is_set():

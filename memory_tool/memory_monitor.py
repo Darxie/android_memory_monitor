@@ -5,7 +5,7 @@ Provides real-time memory tracking with crash detection.
 import time
 import logging
 import re
-from typing import Optional, Dict, Tuple
+from typing import Optional, Tuple
 from threading import Event
 from memory_tool.adb import get_app_pid, AdbDevice
 
@@ -33,7 +33,7 @@ CPU_PATTERNS = [
 class MemoryTool:
     """
     Monitors memory usage of an Android app using uiautomator2.
-    
+
     Attributes:
         package_name: Android package name to monitor
         device: uiautomator2 device instance
@@ -59,7 +59,7 @@ class MemoryTool:
         self.log_interval = log_interval
         self.check_interval = CHECK_INTERVAL
         self.dry_run = dry_run
-        
+
         # State tracking
         self.is_monitoring = False
         self.last_total_memory = 0
@@ -73,11 +73,11 @@ class MemoryTool:
     def extract_memory_value(pattern: str, data: str) -> int:
         """
         Extract a memory value using regex from the data string.
-        
+
         Args:
             pattern: Regex pattern to match
             data: Data string to search in
-            
+
         Returns:
             Memory value in KB, or 0 if not found
         """
@@ -92,7 +92,7 @@ class MemoryTool:
     def check_for_crashes(self) -> bool:
         """
         Check if the app crashed by analyzing logs.
-        
+
         Returns:
             True if crash detected, False otherwise
         """
@@ -101,7 +101,7 @@ class MemoryTool:
     def process_meminfo(self) -> bool:
         """
         Extract memory information using dumpsys meminfo and write to CSV.
-        
+
         Returns:
             True if successful, False otherwise
         """
@@ -119,13 +119,13 @@ class MemoryTool:
         total_memory = self.extract_memory_value(MEMORY_PATTERNS['total_pss'], output)
         if total_memory == 0:
             total_memory = self.extract_memory_value(MEMORY_PATTERNS['total'], output)
-        
+
         if total_memory == 0:
             logging.warning("Could not extract total memory from dumpsys")
             return False
 
         self.last_total_memory = total_memory
-        
+
         # Extract memory components
         java_heap = self.extract_memory_value(MEMORY_PATTERNS['java_heap'], output)
         native_heap = self.extract_memory_value(MEMORY_PATTERNS['native_heap'], output)
@@ -138,11 +138,11 @@ class MemoryTool:
         success = self.writer.write_data(
             timestamp, total_memory, java_heap, native_heap, code, stack, graphics, cpu_usage
         )
-        
+
         if success:
             self.data_points_collected += 1
             self.last_cpu_usage = cpu_usage
-        
+
         return success
 
     def process_cpuinfo(self) -> float:
@@ -274,7 +274,7 @@ class MemoryTool:
         self.cpu_cores = self.get_cpu_core_count()
         self.writer.write_cpu_info(self.cpu_cores)
         logging.info(f"Detected logical CPU cores: {self.cpu_cores}")
-        
+
         try:
             while self.is_monitoring:
                 if self.elapsed_time % self.log_interval == 0:
@@ -287,7 +287,7 @@ class MemoryTool:
                 if self.check_for_crashes():
                     logging.warning("App crash detected, stopping monitor")
                     self.stop_monitoring()
-                    
+
                 time.sleep(self.check_interval)
                 self.elapsed_time += self.check_interval
 
@@ -298,8 +298,7 @@ class MemoryTool:
             if self.monitoring_finished_event:
                 self.monitoring_finished_event.set()
             logging.info(f"Monitoring stopped. Duration: {self.elapsed_time}s, Data points: {self.data_points_collected}")
-    
+
     def stop_monitoring(self):
         """Stop the monitoring thread."""
         self.is_monitoring = False
-    

@@ -35,10 +35,10 @@ def run_test(device, memory_tool):
         time.sleep(
             5
         )  # depends on the device's compute performance. adjust accordingly
-        
+
         # Make "OK, got it" optional
         if device(text="OK, got it").exists(timeout=5):
             device(text="OK, got it").click()
-            
+
         device.press("back")
     memory_tool.stop_monitoring()

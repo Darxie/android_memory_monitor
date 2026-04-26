@@ -166,15 +166,15 @@ def _recover_uiautomator_session(adb: AdbDevice, aggressive: bool = False) -> No
 def initialize_device(package_name, device_code, start_activity=None):
     """
     Initialize connection to the Android device and launch the application.
-    
+
     Args:
         package_name: The package name to run
         device_code: Device serial or identifier
         start_activity: Optional specific activity to launch
-        
+
     Returns:
         Initialized device object
-        
+
     Raises:
         Exception: If device initialization fails
     """

@@ -1,0 +1,41 @@
+[MAIN]
+# Tools (matplotlib, numpy, uiautomator2) are installed in CI, but if pylint
+# runs without the venv, suppress import-error rather than fail the build.
+ignore=output,dashboard,memory,docs
+
+[FORMAT]
+max-line-length=120
+
+[MESSAGES CONTROL]
+disable=
+    # Style preferences — modern Python embraces these patterns
+    logging-fstring-interpolation,
+    broad-exception-caught,
+    pointless-string-statement,
+
+    # Documentation overhead for a small internal tool
+    missing-module-docstring,
+    missing-function-docstring,
+    missing-class-docstring,
+
+    # Heuristic refactor suggestions (often noisy on legacy code)
+    too-many-arguments,
+    too-many-positional-arguments,
+    too-many-locals,
+    too-many-statements,
+    too-many-branches,
+    too-many-return-statements,
+    too-many-instance-attributes,
+    too-many-nested-blocks,
+    duplicate-code,
+
+    # Tkinter / dual-mode-script patterns
+    global-statement,
+    invalid-name,
+    redefined-outer-name,
+    unused-argument,
+    wrong-import-position,
+    wrong-import-order,
+
+    # Environment-dependent (deps may not be importable from lint env)
+    import-error,

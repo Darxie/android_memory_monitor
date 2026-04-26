@@ -1,5 +1,4 @@
 import time
-import logging
 import threading
 from . import shared
 
@@ -14,7 +13,7 @@ def run_test(device, memory_tool):
     """
 
     stop_event = threading.Event()
-    
+
     stop_timer = threading.Timer(
         18000, stop_demonstrate, args=(device, memory_tool, stop_event)
     )

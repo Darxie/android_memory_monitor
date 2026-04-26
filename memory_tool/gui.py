@@ -257,17 +257,17 @@ def get_connected_devices() -> List[Tuple[str, str]]:
     try:
         result = subprocess.check_output(["adb", "devices", "-l"], timeout=5)
         devices: List[Tuple[str, str]] = []
-        
+
         for line in result.splitlines()[1:]:  # Skip header
             line_str = line.decode("utf-8").strip()
             if not line_str:
                 continue
-                
+
             # Extract device code
             device_code = line_str.split()[0]
             if device_code == "List":
                 continue
-            
+
             # Extract model name
             match = re.search(r"model:(\S+)", line_str)
             if match:
@@ -275,7 +275,7 @@ def get_connected_devices() -> List[Tuple[str, str]]:
                 devices.append((model_name, device_code))
             else:
                 devices.append(("Unknown Device", device_code))
-        
+
         return devices
     except subprocess.TimeoutExpired:
         messagebox.showerror("Error", "ADB command timed out. Check device connection.")
@@ -290,14 +290,14 @@ def on_combobox_select(event) -> None:
     """Handle device selection from dropdown."""
     global selected_device_code
     selection = device_dropdown.get()
-    
+
     # Extract device code from formatted string
     match = re.search(r"\((.*?)\)", selection)
     if match:
         selected_device_code = match.group(1)
     else:
         selected_device_code = selection.split()[-1] if selection else None
-    
+
     logger.info(f"Selected device: {selected_device_code}")
 
 
@@ -443,7 +443,7 @@ device_dropdown = ttk.Combobox(
 raw_devices = get_connected_devices()
 if not raw_devices:
     messagebox.showwarning("No Devices", "No Android devices found. Connect a device and try again.")
-    
+
 formatted_devices = [f"{d[0]} ({d[1]})" for d in raw_devices]
 if not formatted_devices:
     formatted_devices = ["No devices detected"]

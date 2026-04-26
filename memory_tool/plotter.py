@@ -106,7 +106,7 @@ def _load_csv_rows(csv_file_path: str) -> List[Dict[str, float]]:
 def _validate_rows(rows: List[Dict[str, float]]) -> Tuple[bool, Optional[str]]:
     """
     Validate parsed rows for plotting.
-    
+
     Returns:
         Tuple of (is_valid, error_message)
     """
@@ -120,7 +120,7 @@ def _validate_rows(rows: List[Dict[str, float]]) -> Tuple[bool, Optional[str]]:
     missing_cols = [col for col in REQUIRED_COLUMNS if col not in sample]
     if missing_cols:
         return False, f"Missing columns: {', '.join(missing_cols)}"
-    
+
     return True, None
 
 
@@ -146,10 +146,10 @@ def analyze_trends(csv_file_path: str) -> bool:
     """
     Analyze memory usage trends to detect potential leaks.
     Writes a report to a text file and logs it.
-    
+
     Args:
         csv_file_path: Path to CSV file
-        
+
     Returns:
         True if analysis successful, False otherwise
     """
@@ -161,13 +161,13 @@ def analyze_trends(csv_file_path: str) -> bool:
             return False
 
         rows = _load_csv_rows(csv_file_path)
-        
+
         # Validate data
         is_valid, error_msg = _validate_rows(rows)
         if not is_valid:
             logging.error(f"Data validation failed: {error_msg}")
             return False
-        
+
         if len(rows) < MIN_DATA_POINTS:
             msg = f"Not enough data points (<{MIN_DATA_POINTS}) for reliable trend analysis."
             logging.warning(msg)
@@ -200,7 +200,7 @@ def analyze_trends(csv_file_path: str) -> bool:
 
             # Convert slope to MB/minute for readability
             slope_mb_min = slope * 60 / 1024
-            
+
             # Classify based on thresholds
             if slope_mb_min > CRITICAL_LEAK_THRESHOLD_MB_MIN:
                 status = "CRITICAL LEAK"
@@ -266,7 +266,7 @@ def analyze_trends(csv_file_path: str) -> bool:
         ANALYSIS_FILE.parent.mkdir(parents=True, exist_ok=True)
         with open(ANALYSIS_FILE, "w", encoding="utf-8") as f:
             f.write(report_str)
-        
+
         return True
 
     except Exception as e:
@@ -277,17 +277,17 @@ def analyze_trends(csv_file_path: str) -> bool:
 def plot_total_memory(csv_file: str) -> bool:
     """
     Plot total memory usage over time.
-    
+
     Args:
         csv_file: Path to CSV file
-        
+
     Returns:
         True if successful, False otherwise
     """
     try:
         _configure_output_paths(csv_file)
         rows = _load_csv_rows(csv_file)
-        
+
         # Validate data
         is_valid, error_msg = _validate_rows(rows)
         if not is_valid:
@@ -309,7 +309,7 @@ def plot_total_memory(csv_file: str) -> bool:
         plt.gca().xaxis.set_major_formatter(mdates.DateFormatter("%H:%M"))
         plt.gca().xaxis.set_major_locator(mdates.AutoDateLocator())
         plt.xticks(rotation=45)
-        
+
         plt.savefig(IMAGE_TOTAL_MEMORY, dpi=DEFAULT_DPI)
         plt.close()
         logging.info("Total memory plot completed")
@@ -406,7 +406,6 @@ def generate_html_report(csv_file: str) -> bool:
                     parsed_app_info["PID"] = line.split(":", 1)[1].strip()
 
             app_info_dict: Dict[str, Any] = {}
-            device_info_dict: Dict[str, Any] = {}
             for marker, label in [("Device Info:\n", "Device"), ("App Info:\n", "App")]:
                 if marker in app_info_text:
                     block = app_info_text.split(marker, 1)[1].split("\n", 1)[0].strip()
@@ -415,8 +414,6 @@ def generate_html_report(csv_file: str) -> bool:
                         if isinstance(parsed_dict, dict):
                             if label == "App":
                                 app_info_dict = parsed_dict
-                            if label == "Device":
-                                device_info_dict = parsed_dict
                             for key in ("versionName", "versionCode", "sdkInt", "currentPackageName", "targetSdk", "minSdk"):
                                 if key in parsed_dict:
                                     parsed_app_info[f"{label} {key}"] = str(parsed_dict[key])
@@ -553,10 +550,10 @@ def generate_html_report(csv_file: str) -> bool:
 def plot_memory_data(csv_file: str) -> bool:
     """
     Plot stacked memory data and generate analysis report.
-    
+
     Args:
         csv_file: Path to CSV file
-        
+
     Returns:
         True if all operations successful, False otherwise
     """
@@ -583,7 +580,7 @@ def plot_memory_data(csv_file: str) -> bool:
         code = np.array([row["code"] / divisor for row in rows], dtype=float)
         stack = np.array([row["stack"] / divisor for row in rows], dtype=float)
         graphics = np.array([row["graphics"] / divisor for row in rows], dtype=float)
-        
+
         logging.info(f"Memory unit selected: {memory_unit}")
 
         # Create stacked area plot
@@ -619,9 +616,9 @@ def plot_memory_data(csv_file: str) -> bool:
         success &= plot_cpu_usage(csv_file)
         success &= analyze_trends(csv_file)
         success &= generate_html_report(csv_file)
-        
+
         return success
-        
+
     except Exception as e:
         logging.error(f"Error plotting memory data: {e}", exc_info=True)
         return False
