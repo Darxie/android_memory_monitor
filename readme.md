@@ -1,23 +1,130 @@
-# Readme
+# Android Memory Monitor
 
-## Why are we using the PSS metric instead of RSS?
+Python tool that automates Android UI scenarios and measures the resulting memory (PSS) and CPU usage of the app under test. Drives `uiautomator2`, samples `dumpsys meminfo` / `cpuinfo` on a configurable interval, detects crashes via logcat, and produces per-run plots plus an aggregated batch HTML report.
 
-When monitoring memory usage of your app on Android, the two common metrics are PSS (Proportional Set Size) and RSS (Resident Set Size). Each provides valuable information, but for app optimization purposes on Android, PSS is typically the more useful metric. Here's why:
+Targets two apps today: **Sygic Profi** and **EW Navi**.
 
-### PSS (Proportional Set Size)
+## Requirements
 
-Definition: PSS represents the amount of memory used by an application, where shared memory is divided proportionally among the apps using that memory. In other words, if three apps are using a shared memory segment of 3 MB, that 3 MB would only count as 1 MB for each app's PSS.
+- Python 3.10+
+- ADB on `PATH`
+- An Android device with USB debugging enabled
+- `pip install -r requirements.txt` — installs `uiautomator2`, `matplotlib`, `seaborn`, `pandas`, `packaging`
 
-Relevance: This is especially useful for Android because many processes (apps) often share memory due to the Android runtime, system processes, and common libraries. PSS gives a more realistic measure of the memory footprint of an app, accounting for this shared memory.
+## Quick start
 
-Use Case: PSS is often the metric of choice when you're concerned about the overall memory usage impact of your app on the system.
+1. Connect a device via USB, accept the debugging prompt
+2. Verify ADB sees it: `adb devices`
+3. Launch the GUI:
+   ```
+   python -m memory_tool.gui
+   ```
+4. Pick device, app, build version (release/debug), log interval
+5. Click a use case button to run a single scenario, or **Run Batch** to run the full Sygic core sequence (`compute → search → fg_bg → zoom → demonstrate`)
 
-### RSS (Resident Set Size)
+## Multiple connected devices
 
-Definition: RSS is the portion of application memory that is held in RAM. Unlike PSS, it doesn't account for shared memory in a proportional way. So, if three apps are sharing a memory segment of 3 MB, that 3 MB would count in its entirety for each of the three apps, which can be misleading.
+The GUI device dropdown lists every device returned by `adb devices`. The selected device's serial is propagated through every ADB call (`AdbDevice` wrapper in `memory_tool/adb.py`) so you can run tests on one device while doing other Android work on another.
 
-Relevance: While RSS can give a snapshot of how much memory is currently resident in RAM for an app, it can provide an inflated and potentially misleading view of an app's actual memory cost to the system, especially when shared libraries are in use.
+## Use cases (Sygic Profi)
 
-### Conclusion
+| Use case      | What it does |
+|---------------|--------------|
+| `compute`     | Searches for a destination, computes a route, presses back. Repeats. |
+| `search`      | Two POI searches in different countries, taps results, returns to typing. Repeats. |
+| `fg_bg`       | Switches the app to background (Calendar) and back. Stress-tests foreground/background lifecycle. |
+| `zoom`        | Searches Mt. Everest, zooms out 20× then in 20×. Repeats. |
+| `demonstrate` | Computes a long route and runs Demonstrate route, with arrival watchers and a 12-hour safety timeout. |
 
-For app developers, especially when optimizing for memory usage, PSS is generally the preferred metric. This is because it more accurately represents the memory cost of your app to the overall system. If you're trying to assess how your app behaves in a memory-constrained environment or aiming to minimize its impact on system resources, PSS provides a clearer picture.
+Use case descriptions visible in the dashboard live in `dashboard/data/use_cases.json` and can be edited without touching code.
+
+## Output artifacts
+
+Each run drops files into `output/<timestamp>/`:
+
+- `memory_usage_<timestamp>.csv` — raw samples (timestamp, total_memory, java_heap, native_heap, code, stack, graphics, cpu_usage)
+- `memory_stacked_line_chart_<timestamp>.png` — stacked memory components over time
+- `memory_total_<timestamp>.png` — total PSS over time
+- `cpu_usage_<timestamp>.png` — CPU usage over time
+- `memory_analysis_<timestamp>.txt` — leak detection (linear regression slopes, classifications)
+- `app_info.txt` — device / app / PID metadata
+- `crash_log_<timestamp>.txt` — only if a crash was detected
+
+A batch run additionally produces `output/batch_report_<app>_<timestamp>.html` aggregating every use case into one document.
+
+## Dashboard — compare SDK versions
+
+After every batch, `memory_tool/archive.py` copies the per-use-case CSVs into `dashboard/data/runs/<timestamp>_sdk<version>/` and updates `dashboard/data/manifest.json`. The SDK is parsed from `versionName` in `app_info.txt` (regex `SDK\s+(\d+(?:\.\d+)+)`); only one run per SDK is kept (a new run for the same SDK replaces the old one).
+
+To preview locally:
+
+```
+python dashboard/serve.py
+```
+
+This serves `dashboard/` on `http://localhost:8000` (browsers block `fetch()` from `file://`, so `index.html` won't work when opened directly).
+
+The dashboard renders one Plotly chart per use case, with one line per SDK version, sorted by semver. Click a SDK in the legend to toggle it on or off.
+
+## Publish to feldis.cz over FTP
+
+Once the local dashboard looks right, upload it:
+
+1. First time only: copy the credentials template and fill in your details:
+   ```
+   copy .ftp_credentials.example .ftp_credentials
+   ```
+   `.ftp_credentials` is gitignored. Edit it to set `user` and `password`.
+
+2. Dry-run to preview what will be uploaded:
+   ```
+   python publish.py --dry-run
+   ```
+
+3. Real upload:
+   ```
+   python publish.py
+   ```
+
+The script connects via plain FTP (webhouse.sk doesn't support FTPS), navigates to `target_path` (creating subdirectories as needed) and uploads everything in `dashboard/` except `serve.py`.
+
+## Project structure
+
+```
+memory_tool/
+  gui.py             # Tkinter UI: device + app + use case selection
+  runner.py          # Orchestration: device init, batch sequencing, finalization
+  memory_monitor.py  # Background sampling thread (dumpsys meminfo / cpuinfo, /proc deltas)
+  writer.py          # CSV + crash log writer
+  plotter.py         # Per-run plots and trend analysis
+  reporter.py        # Aggregated batch HTML report
+  archive.py         # Copies batch results into dashboard/, updates manifest
+  app_info.py        # Captures device + app metadata into app_info.txt
+  adb.py             # AdbDevice wrapper; every command targets the selected serial
+  utils.py           # _write_to_file helper
+  timestamp.py       # Singleton run timestamp
+  config.py          # APPLICATIONS dict (package names, use cases, start activity)
+  use_cases/
+    protocol.py      # validate(module) — fails import-time if run_test is missing
+    sygic_profi/     # compute, search, fg_bg, zoom, demonstrate, ...
+    ew_navi/         # compute, search
+
+dashboard/
+  index.html         # Plotly viewer
+  assets/{app.js, style.css}
+  data/manifest.json # archived runs (kept up to date by archive.py)
+  data/use_cases.json
+  serve.py           # local HTTP server for previewing the dashboard
+
+publish.py           # FTP uploader for the dashboard
+```
+
+## Why PSS instead of RSS
+
+When measuring app memory on Android, two metrics are commonly available — PSS (Proportional Set Size) and RSS (Resident Set Size).
+
+**PSS** divides shared memory proportionally between processes that use it. If three apps share a 3 MB segment, each is charged 1 MB. This is the realistic memory cost of your app to the system, and it is what we sample via `dumpsys meminfo`.
+
+**RSS** counts the entire shared segment against every process holding it open. The same 3 MB above would be counted as 3 MB for each of the three apps. RSS overstates per-app cost and can move for reasons unrelated to your code (other apps loading the same library).
+
+For app-level optimization on Android — which is what this tool is for — PSS is the right metric.

@@ -2,12 +2,17 @@
 Memory data plotting and analysis module.
 Generates visualizations and trend analysis reports.
 """
+import matplotlib
+# Use a non-interactive backend to avoid Tkinter teardown/thread issues in CLI runs.
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from pathlib import Path
 import matplotlib.dates as mdates
 import logging
 import numpy as np
 import csv
+import ast
+import html
 from datetime import datetime
 from typing import Optional, Tuple, List, Dict, Any
 from memory_tool.timestamp import ExecutionTimestamp
@@ -22,7 +27,6 @@ IMAGE_TOTAL_MEMORY = directory / f"memory_total_{timestamp}.png"
 IMAGE_CPU_USAGE = directory / f"cpu_usage_{timestamp}.png"
 ANALYSIS_FILE = directory / f"memory_analysis_{timestamp}.txt"
 HTML_REPORT_FILE = directory / f"report_{timestamp}.html"
-CPU_INFO_FILE = directory / f"cpu_info_{timestamp}.txt"
 
 # Constants
 MIN_DATA_POINTS = 10
@@ -45,7 +49,7 @@ def _configure_output_paths(csv_file_path: str) -> None:
     the run timestamp was reset.
     """
     global IMAGE_STACKED_MEMORY, IMAGE_TOTAL_MEMORY, IMAGE_CPU_USAGE
-    global ANALYSIS_FILE, HTML_REPORT_FILE, CPU_INFO_FILE
+    global ANALYSIS_FILE, HTML_REPORT_FILE
 
     csv_path = Path(csv_file_path)
     output_dir = csv_path.parent
@@ -62,7 +66,6 @@ def _configure_output_paths(csv_file_path: str) -> None:
     IMAGE_CPU_USAGE = output_dir / f"cpu_usage_{run_timestamp}.png"
     ANALYSIS_FILE = output_dir / f"memory_analysis_{run_timestamp}.txt"
     HTML_REPORT_FILE = output_dir / f"report_{run_timestamp}.html"
-    CPU_INFO_FILE = output_dir / f"cpu_info_{run_timestamp}.txt"
 
 
 def _safe_float(value: Any, default: float = 0.0) -> float:
@@ -247,11 +250,6 @@ def analyze_trends(csv_file_path: str) -> bool:
             cpu_verdict = "PASS"
         report.append(f"CPU_HEALTH_VERDICT: {cpu_verdict}")
 
-        if CPU_INFO_FILE.exists():
-            report.append("-" * 40)
-            report.append("CPU INTERPRETATION")
-            report.append(CPU_INFO_FILE.read_text(encoding="utf-8").strip())
-
         report.append("-" * 40)
         if leaks:
             report.append("POTENTIAL LEAKS DETECTED:")
@@ -392,6 +390,60 @@ def generate_html_report(csv_file: str) -> bool:
         if ANALYSIS_FILE.exists():
             analysis_text = ANALYSIS_FILE.read_text(encoding="utf-8")
 
+        app_info_file = csv_path.parent / "app_info.txt"
+        app_info_text = app_info_file.read_text(encoding="utf-8") if app_info_file.exists() else ""
+
+        parsed_app_info: Dict[str, str] = {}
+        parsed_about_fields: Dict[str, str] = {}
+        if app_info_text:
+            lines = app_info_text.splitlines()
+            for line in lines:
+                if line.startswith("Use case:"):
+                    parsed_app_info["Use Case"] = line.split(":", 1)[1].strip()
+                elif line.startswith("Device:"):
+                    parsed_app_info["Device"] = line.split(":", 1)[1].strip()
+                elif line.startswith("PID:"):
+                    parsed_app_info["PID"] = line.split(":", 1)[1].strip()
+
+            app_info_dict: Dict[str, Any] = {}
+            device_info_dict: Dict[str, Any] = {}
+            for marker, label in [("Device Info:\n", "Device"), ("App Info:\n", "App")]:
+                if marker in app_info_text:
+                    block = app_info_text.split(marker, 1)[1].split("\n", 1)[0].strip()
+                    try:
+                        parsed_dict = ast.literal_eval(block)
+                        if isinstance(parsed_dict, dict):
+                            if label == "App":
+                                app_info_dict = parsed_dict
+                            if label == "Device":
+                                device_info_dict = parsed_dict
+                            for key in ("versionName", "versionCode", "sdkInt", "currentPackageName", "targetSdk", "minSdk"):
+                                if key in parsed_dict:
+                                    parsed_app_info[f"{label} {key}"] = str(parsed_dict[key])
+                    except Exception:
+                        pass
+
+            if "About Screenshot Parsed Fields:" in app_info_text:
+                fields_part = app_info_text.split("About Screenshot Parsed Fields:\n", 1)[1]
+                for raw_line in fields_part.splitlines():
+                    line = raw_line.strip()
+                    if not line.startswith("-"):
+                        break
+                    content = line[1:].strip()
+                    if ":" in content:
+                        key, value = content.split(":", 1)
+                        parsed_about_fields[key.strip()] = value.strip()
+
+            version_summary = {
+                "app_version": parsed_about_fields.get("app_version") or str(app_info_dict.get("versionName", "N/A")),
+                "map_version": parsed_about_fields.get("map_version", "N/A"),
+            }
+        else:
+            version_summary = {
+                "app_version": "N/A",
+                "map_version": "N/A",
+            }
+
         def image_section_lines(title: str, image_path: Path) -> List[str]:
             if image_path.exists():
                 return [
@@ -424,6 +476,13 @@ def generate_html_report(csv_file: str) -> bool:
             "    .meta { margin: 4px 0; color: var(--muted); }",
             "    section { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px; margin-bottom: 16px; }",
             "    h2 { margin: 0 0 10px 0; color: var(--accent); font-size: 1.1rem; }",
+            "    .meta-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }",
+            "    .meta-card { border: 1px solid var(--line); border-radius: 10px; padding: 10px; background: #fbfcfd; }",
+            "    .meta-card h3 { margin: 0 0 8px 0; font-size: 0.98rem; color: #0f766e; }",
+            "    .kv-row { display: flex; justify-content: space-between; gap: 12px; border-bottom: 1px dashed #d6dce4; padding: 5px 0; }",
+            "    .kv-row:last-child { border-bottom: 0; }",
+            "    .kv-k { color: #5b616b; }",
+            "    .kv-v { color: #111827; font-weight: 600; text-align: right; word-break: break-word; }",
             "    img { width: 100%; height: auto; border-radius: 8px; border: 1px solid var(--line); }",
             "    pre { margin: 0; white-space: pre-wrap; word-break: break-word; background: #fbfcfd; border: 1px solid var(--line); border-radius: 8px; padding: 12px; color: #111827; font-size: 0.93rem; line-height: 1.45; }",
             "  </style>",
@@ -438,6 +497,36 @@ def generate_html_report(csv_file: str) -> bool:
             f"      <p class=\"meta\"><strong>End:</strong> {end_dt}</p>",
             "    </header>",
         ]
+
+        if parsed_app_info or parsed_about_fields or app_info_text:
+            html_lines.extend([
+                "    <section>",
+                "      <h2>Run Metadata</h2>",
+                "      <div class=\"meta-grid\">",
+            ])
+
+            html_lines.append("        <article class=\"meta-card\"><h3>Version Summary</h3>")
+            html_lines.append(
+                f"          <div class=\"kv-row\"><span class=\"kv-k\">App Version</span><span class=\"kv-v\">{html.escape(version_summary['app_version'])}</span></div>"
+            )
+            html_lines.append(
+                f"          <div class=\"kv-row\"><span class=\"kv-k\">Map Version</span><span class=\"kv-v\">{html.escape(version_summary['map_version'])}</span></div>"
+            )
+            html_lines.append("        </article>")
+
+            if parsed_app_info:
+                html_lines.append("        <article class=\"meta-card\"><h3>App & Device</h3>")
+                for key, value in parsed_app_info.items():
+                    html_lines.append(
+                        f"          <div class=\"kv-row\"><span class=\"kv-k\">{html.escape(key)}</span><span class=\"kv-v\">{html.escape(value)}</span></div>"
+                    )
+                html_lines.append("        </article>")
+
+            html_lines.extend([
+                "      </div>",
+                "    </section>",
+            ])
+
         html_lines.extend(image_section_lines("Memory Usage (Stacked)", IMAGE_STACKED_MEMORY))
         html_lines.extend(image_section_lines("Total Memory", IMAGE_TOTAL_MEMORY))
         html_lines.extend(image_section_lines("CPU Usage", IMAGE_CPU_USAGE))
@@ -445,7 +534,7 @@ def generate_html_report(csv_file: str) -> bool:
             [
                 "    <section>",
                 "      <h2>Analysis Summary</h2>",
-                f"      <pre>{analysis_text}</pre>",
+                f"      <pre>{html.escape(analysis_text)}</pre>",
                 "    </section>",
                 "  </main>",
                 "</body>",

@@ -4,15 +4,20 @@ from . import shared
 
 
 """
-NECESSARY MAPS - Slovakia, South Carolina, Singapore
+NECESSARY MAPS - Slovakia, South Carolina, Singapore, Italy
 """
+
+ITERATIONS_FULL = 100
+ITERATIONS_DRY_RUN = 20
+
 
 # crashes spontaneously
 def run_test(device, memory_tool):
     """
     Simulate user interactions on the device.
     """
-    for i in range(0, 100):
+    iterations = ITERATIONS_DRY_RUN if memory_tool.dry_run else ITERATIONS_FULL
+    for i in range(iterations):
         logging.info(f"Mambo number {i+1}")
         shared.tap_search_bar(device)
         time.sleep(1)

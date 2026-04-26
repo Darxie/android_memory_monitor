@@ -3,12 +3,12 @@ Memory data writer module for Android memory monitoring.
 Handles CSV writing, crash detection, and plot generation.
 """
 import csv
-import subprocess
 from pathlib import Path
 import logging
 import time
 from typing import Optional, List, Tuple, Union
-from memory_tool.utils import execute_adb_command, _write_to_file, get_app_pid
+from memory_tool.adb import AdbDevice, get_app_pid
+from memory_tool.utils import _write_to_file
 from memory_tool.timestamp import ExecutionTimestamp
 from memory_tool import plotter
 
@@ -43,13 +43,15 @@ class Writer:
         crash_log_file: Path to crash log file
     """
     
-    def __init__(self, output_dir: Optional[Path] = None):
+    def __init__(self, adb: Optional[AdbDevice] = None, output_dir: Optional[Path] = None):
         """
         Initialize CSV file with headers.
-        
+
         Args:
+            adb: AdbDevice targeting the monitored device; falls back to whichever device ADB finds
             output_dir: Optional custom output directory. If None, uses default timestamped directory.
         """
+        self.adb = adb or AdbDevice()
         timestamp = ExecutionTimestamp.get_timestamp()
         
         if output_dir:
@@ -338,8 +340,8 @@ class Writer:
         self.crash_checks += 1
         
         try:
-            logcat_output = execute_adb_command(["adb", "logcat", "-d"])
-            
+            logcat_output = self.adb.logcat_dump()
+
             if not logcat_output:
                 logging.debug("Empty logcat output received")
                 return False
@@ -350,28 +352,20 @@ class Writer:
                 logging.warning(f"Crash detected in {package_name}. Saving crash logs.")
                 _write_to_file(self.crash_log_file, logcat_output)
                 return True
-            
+
             # Save filtered logs by PID
-            pid = get_app_pid(package_name)
+            pid = get_app_pid(package_name, self.adb)
             filtered_logs = self._filter_logs_by_pid(logcat_output, pid)
-            
+
             if filtered_logs:
                 log_content = "\n".join(filtered_logs) + "\n"
                 _write_to_file(self.logcat_file, log_content)
                 logging.debug(f"Captured {len(filtered_logs)} log lines for PID {pid}")
 
             # Clear logcat buffer
-            subprocess.run(
-                ["adb", "logcat", "-c"],
-                check=False,
-                timeout=LOGCAT_CLEAR_TIMEOUT,
-                capture_output=True
-            )
+            self.adb.logcat_clear()
             return False
-                
-        except subprocess.TimeoutExpired:
-            logging.error("Logcat clear command timed out")
-            return False
+
         except Exception as e:
             logging.error(f"Error capturing app log: {e}", exc_info=True)
             return False
@@ -401,10 +395,3 @@ class Writer:
             'output_directory': str(self.directory),
         }
 
-
-# Maintain backward compatibility
-timestamp = ExecutionTimestamp.get_timestamp()
-directory = Path(f"output/{timestamp}")
-CSV_FILE = directory / f"memory_usage_{timestamp}.csv"
-LOGCAT_FILE = directory / f"logcat_{timestamp}.txt"
-CRASH_LOG_FILE = directory / f"crash_log_{timestamp}.txt"

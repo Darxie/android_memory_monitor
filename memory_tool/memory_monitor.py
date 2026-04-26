@@ -7,7 +7,7 @@ import logging
 import re
 from typing import Optional, Dict, Tuple
 from threading import Event
-from memory_tool.utils import get_app_pid, execute_adb_command
+from memory_tool.adb import get_app_pid, AdbDevice
 
 # Configuration constants
 DEFAULT_LOG_INTERVAL = 30  # seconds
@@ -43,19 +43,22 @@ class MemoryTool:
     """
 
     def __init__(
-        self, 
-        writer, 
-        package_name: str, 
-        device, 
-        monitoring_finished_event: Optional[Event] = None, 
-        log_interval: int = DEFAULT_LOG_INTERVAL
+        self,
+        writer,
+        package_name: str,
+        device,
+        monitoring_finished_event: Optional[Event] = None,
+        log_interval: int = DEFAULT_LOG_INTERVAL,
+        dry_run: bool = False,
     ):
         self.writer = writer
         self.package_name = package_name
         self.device = device
+        self.adb = AdbDevice(device.serial)
         self.monitoring_finished_event = monitoring_finished_event
         self.log_interval = log_interval
         self.check_interval = CHECK_INTERVAL
+        self.dry_run = dry_run
         
         # State tracking
         self.is_monitoring = False
@@ -150,7 +153,7 @@ class MemoryTool:
             CPU usage percent as float, 0.0 if unavailable
         """
         # Primary method: /proc deltas per PID for stable and time-local readings.
-        pid = get_app_pid(self.package_name)
+        pid = get_app_pid(self.package_name, self.adb)
         if pid and pid != "None":
             cpu_value = self._read_cpu_from_proc(pid)
             if cpu_value is not None:
@@ -265,7 +268,7 @@ class MemoryTool:
         logging.info(f"Starting memory monitoring for {self.package_name}")
 
         # Clear old logs so crash detection is based only on this run.
-        execute_adb_command(["adb", "logcat", "-c"])
+        self.adb.logcat_clear()
         logging.info("Logcat cleared before monitoring start")
 
         self.cpu_cores = self.get_cpu_core_count()

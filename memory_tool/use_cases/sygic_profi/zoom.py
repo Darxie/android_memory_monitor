@@ -6,6 +6,9 @@ from . import shared
 NECESSARY MAPS - Nepal
 """
 
+ITERATIONS_FULL = 100
+ITERATIONS_DRY_RUN = 20
+
 
 def run_test(device, memory_tool):
     """
@@ -14,7 +17,8 @@ def run_test(device, memory_tool):
     zoom_to_nepal(device)
     device.xpath('//*[@resource-id="com.sygic.profi.beta:id/zoomControls"]').click()
 
-    for i in range(0, 100):
+    iterations = ITERATIONS_DRY_RUN if memory_tool.dry_run else ITERATIONS_FULL
+    for i in range(iterations):
         logging.info(f"Mambo number {i+1}")
 
         for _zoom_out in range(0, 20):

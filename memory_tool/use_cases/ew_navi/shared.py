@@ -1,3 +1,6 @@
+import logging
+
+
 def tap_search_bar(device):
     """
     Taps on the search bar of the Sygic app.
@@ -37,13 +40,12 @@ def tap_x_button(device):
     device(resourceId="SearchBar.CloseButton").click()
 
 
-def take_about_screenshot(device, file_path):
+def read_about_screen(device):
     """
-    Navigates to the About screen, takes a screenshot, and returns to the map.
+    Navigate to the About screen, dump the UI hierarchy, and return to the map.
 
-    Args:
-        device: The device object.
-        file_path: Path to save the screenshot.
+    Returns:
+        {"ui_hierarchy": "<XML dump>"} — used by app_info.py to extract the SDK version.
     """
     # Menu - Settings - Info - About
     device(resourceId="FreeDrive.Avatar").click()
@@ -51,11 +53,15 @@ def take_about_screenshot(device, file_path):
     device(text="Info").click()
     device(text="About").click()
     device(text="Product").click()
-    # Take screenshot
-    device.screenshot(file_path)
-    # Get back to map
-    # Back button is at bounds [19,155][145,281], center (82, 218)
-    device.click(82, 218)
-    device.click(82, 218)
-    device.click(82, 218)
-    device.click(82, 218)
+
+    ui_hierarchy = ""
+    try:
+        ui_hierarchy = device.dump_hierarchy(compressed=False)
+    except Exception as e:
+        logging.warning(f"Failed to dump About UI hierarchy: {e}")
+
+    # Back to map (4 back-button presses; bounds [19,155][145,281], center 82,218)
+    for _ in range(4):
+        device.click(82, 218)
+
+    return {"ui_hierarchy": ui_hierarchy}

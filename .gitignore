@@ -148,3 +148,7 @@ cython_debug/
 
 output/
 python_run_log.txt
+.ftp_credentials
+.claude/
+dashboard/data/runs/
+dashboard/data/manifest.json

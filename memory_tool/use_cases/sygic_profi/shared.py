@@ -1,3 +1,5 @@
+import logging
+
 def tap_search_bar(device):
     """
     Taps on the search bar of the Sygic app.
@@ -35,24 +37,40 @@ def tap_x_button(device):
     """
     device.xpath('//*[@resource-id="PoiDetail.Close"]').click()
 
-def take_about_screenshot(device, file_path):
+def read_about_screen(device):
     """
-    Navigates to the About screen, takes a screenshot, and returns to the map.
+    Navigate to the About screen, dump the UI hierarchy, and return to the map.
 
-    Args:
-        device: The device object.
-        file_path: Path to save the screenshot.
+    Returns:
+        {"ui_hierarchy": "<XML dump>"} — used by app_info.py to extract the SDK version.
     """
     # Menu - Settings - Info - About
-    device(resourceId="SearchBar.MenuIcon").click()
+    menu_icon = device(resourceId="SearchBar.MenuIcon")
+    profile_icon = device(resourceId="SearchBar.ProfileIcon")
+    if menu_icon.exists(timeout=3):
+        menu_icon.click()
+    elif profile_icon.exists(timeout=3):
+        logging.info("SearchBar.MenuIcon not found, using SearchBar.ProfileIcon")
+        profile_icon.click()
+    else:
+        raise RuntimeError(
+            "Neither SearchBar.MenuIcon nor SearchBar.ProfileIcon was found"
+        )
     device(resourceId="MainMenu.Settings").click()
     device(resourceId="Settings.Info").click()
     device(resourceId="Settings.Info.About").click()
     device(resourceId="Settings.Info.Product").click()
-    # Take screenshot
-    device.screenshot(file_path)
+
+    ui_hierarchy = ""
+    try:
+        ui_hierarchy = device.dump_hierarchy(compressed=False)
+    except Exception as e:
+        logging.warning(f"Failed to dump About UI hierarchy: {e}")
+
     # Get back to map
     device(resourceId="BackButton").click()
     device(resourceId="Settings.Back").click()
     device(resourceId="Settings.Back").click()
     device(resourceId="MainMenu.Back").click()
+
+    return {"ui_hierarchy": ui_hierarchy}

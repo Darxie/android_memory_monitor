@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sygic Memory Dashboard</title>
+  <link rel="stylesheet" href="assets/style.css">
+  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js" charset="utf-8"></script>
+</head>
+<body>
+  <main class="wrap">
+    <header>
+      <h1>Memory Monitor Dashboard</h1>
+      <p class="meta" id="summary">Loading...</p>
+    </header>
+
+    <section class="maps-overview" id="maps-overview" hidden>
+      <h2>Required Maps</h2>
+      <p class="all-maps"></p>
+      <details>
+        <summary>By use case</summary>
+        <ul class="per-use-case"></ul>
+      </details>
+    </section>
+
+    <section class="empty" id="empty-state" hidden>
+      <h2>No runs archived yet</h2>
+      <p>Run a batch on a connected device. Once it completes, results will appear here.</p>
+    </section>
+
+    <section id="charts"></section>
+  </main>
+  <script src="assets/app.js"></script>
+</body>
+</html>
