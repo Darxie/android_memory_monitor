@@ -1,0 +1,30 @@
+{
+  "runs": [
+    {
+      "id": "20260426_141859_sdk28.4.13",
+      "sdk": "28.4.13",
+      "date": "2026-04-26T14:18:59",
+      "app": "sygic_profi",
+      "use_cases": {
+        "compute": "data/runs/20260426_141859_sdk28.4.13/compute.csv",
+        "search": "data/runs/20260426_141859_sdk28.4.13/search.csv",
+        "fg_bg": "data/runs/20260426_141859_sdk28.4.13/fg_bg.csv",
+        "zoom": "data/runs/20260426_141859_sdk28.4.13/zoom.csv",
+        "demonstrate": "data/runs/20260426_141859_sdk28.4.13/demonstrate.csv"
+      }
+    },
+    {
+      "id": "20260427_092610_sdk28.4.14",
+      "sdk": "28.4.14",
+      "date": "2026-04-27T09:26:10",
+      "app": "sygic_profi",
+      "use_cases": {
+        "compute": "data/runs/20260427_092610_sdk28.4.14/compute.csv",
+        "search": "data/runs/20260427_092610_sdk28.4.14/search.csv",
+        "fg_bg": "data/runs/20260427_092610_sdk28.4.14/fg_bg.csv",
+        "zoom": "data/runs/20260427_092610_sdk28.4.14/zoom.csv",
+        "demonstrate": "data/runs/20260427_092610_sdk28.4.14/demonstrate.csv"
+      }
+    }
+  ]
+}
