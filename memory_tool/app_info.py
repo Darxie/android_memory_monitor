@@ -11,7 +11,9 @@ from memory_tool.utils import _write_to_file
 SDK_PATTERN = re.compile(r"SDK\s+(\d+(?:\.\d+)+)", re.IGNORECASE)
 
 
-def _get_output_info_path() -> Path:
+def _get_output_info_path(output_dir: Optional[Path] = None) -> Path:
+    if output_dir is not None:
+        return Path(output_dir) / "app_info.txt"
     run_timestamp = ExecutionTimestamp.get_timestamp()
     return Path(f"output/{run_timestamp}") / "app_info.txt"
 
@@ -57,7 +59,7 @@ def _extract_sdk(device, read_about) -> Optional[str]:
     return match.group(1) if match else None
 
 
-def print_app_info(device, package_name: str, use_case: str, adb: AdbDevice, read_about=None):
+def print_app_info(device, package_name: str, use_case: str, adb: AdbDevice, read_about=None, output_dir: Optional[Path] = None):
     """
     Log and save application and device information.
 
@@ -68,9 +70,11 @@ def print_app_info(device, package_name: str, use_case: str, adb: AdbDevice, rea
         adb: AdbDevice instance targeting the correct device
         read_about: Optional callable(device) that opens the About screen and
             returns {"ui_hierarchy": "..."}; used solely to pull the SDK version.
+        output_dir: Where to write app_info.txt. If None, falls back to
+            output/<ExecutionTimestamp>/.
     """
     try:
-        info_file = _get_output_info_path()
+        info_file = _get_output_info_path(output_dir)
         app_info = device.app_info(package_name)
         device_id = adb.device_code or device.serial
         pid = get_app_pid(package_name, adb)

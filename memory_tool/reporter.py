@@ -33,12 +33,22 @@ def _render_path_for_html(report_file: Path, target_path: Path) -> str:
     return str(target_path.relative_to(report_file.parent)).replace("\\", "/")
 
 
-def generate_batch_report(run_artifacts: list[dict], app_name_internal: str) -> Path:
-    """Generate one HTML report that aggregates multiple use-case runs."""
-    output_root = Path("output")
-    output_root.mkdir(parents=True, exist_ok=True)
-    batch_stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    report_file = output_root / f"batch_report_{app_name_internal}_{batch_stamp}.html"
+def generate_batch_report(run_artifacts: list[dict], app_name_internal: str, output_dir: Path | None = None) -> Path:
+    """Generate one HTML report that aggregates multiple use-case runs.
+
+    If output_dir is provided (typical batch flow), the report is saved there
+    as `batch_report.html`. Otherwise it falls back to a timestamped filename
+    at the output/ root.
+    """
+    if output_dir is not None:
+        output_dir = Path(output_dir)
+        output_dir.mkdir(parents=True, exist_ok=True)
+        report_file = output_dir / "batch_report.html"
+    else:
+        output_root = Path("output")
+        output_root.mkdir(parents=True, exist_ok=True)
+        batch_stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        report_file = output_root / f"batch_report_{app_name_internal}_{batch_stamp}.html"
 
     cards = []
     for index, run in enumerate(run_artifacts, start=1):

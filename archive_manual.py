@@ -62,42 +62,61 @@ def inject_sdk(app_info_path: Path, sdk: str) -> None:
 
 
 def list_output_dirs() -> None:
-    """Print each output dir together with its use case for easy picking."""
+    """Print each output dir (single-run or batch subdir) with its use case."""
     if not OUTPUT_ROOT.is_dir():
         print(f"{OUTPUT_ROOT}/ does not exist")
         return
+
     rows = []
-    for child in sorted(OUTPUT_ROOT.iterdir()):
-        if not child.is_dir():
-            continue
-        app_info = child / "app_info.txt"
-        if not app_info.exists():
-            rows.append((child.name, "(no app_info.txt)"))
-            continue
+    for app_info in sorted(OUTPUT_ROOT.rglob("app_info.txt")):
+        run_dir = app_info.parent
+        rel = run_dir.relative_to(OUTPUT_ROOT)
         try:
             uc = parse_use_case(app_info)
         except ValueError:
             uc = "(no Use case: line)"
-        rows.append((child.name, uc))
-    width = max((len(name) for name, _ in rows), default=10)
+        rows.append((str(rel).replace("\\", "/"), uc))
+
+    if not rows:
+        print("(no runs found)")
+        return
+
+    width = max(len(name) for name, _ in rows)
     for name, uc in rows:
         print(f"{name:<{width}}  {uc}")
 
 
-def archive(sdk: str, app: str, dirs: list[str]) -> None:
-    artifacts = []
-    for d in dirs:
+def _expand_paths(paths: list[str]) -> list[Path]:
+    """Accept either a use-case dir or a batch dir; return list of use-case dirs."""
+    expanded: list[Path] = []
+    for d in paths:
         path = Path(d)
         if not path.is_dir():
             sys.exit(f"Not a directory: {d}")
-        app_info = path / "app_info.txt"
-        if not app_info.exists():
-            sys.exit(f"No app_info.txt in {path}")
 
+        if (path / "app_info.txt").exists():
+            expanded.append(path)
+            continue
+
+        # Treat as batch dir: look for subdirs containing app_info.txt
+        subdirs = [c for c in sorted(path.iterdir()) if c.is_dir() and (c / "app_info.txt").exists()]
+        if not subdirs:
+            sys.exit(f"No app_info.txt in {path} or its subdirectories")
+        expanded.extend(subdirs)
+
+    return expanded
+
+
+def archive(sdk: str, app: str, dirs: list[str]) -> None:
+    use_case_dirs = _expand_paths(dirs)
+    artifacts = []
+    for path in use_case_dirs:
+        app_info = path / "app_info.txt"
         inject_sdk(app_info, sdk)
         use_case = parse_use_case(app_info)
         artifacts.append(collect_run_artifacts(path, use_case))
-        print(f"  prepared {use_case:<14} from {path.name}")
+        rel = path.relative_to(OUTPUT_ROOT) if path.is_relative_to(OUTPUT_ROOT) else path
+        print(f"  prepared {use_case:<14} from {str(rel).replace(chr(92), '/')}")
 
     result = archive_batch(artifacts, app)
     if result:

@@ -1,4 +1,5 @@
 from pathlib import Path
+from datetime import datetime
 import sys
 import logging
 import threading
@@ -217,7 +218,7 @@ def initialize_device(package_name, device_code, start_activity=None):
             raise
 
 
-def run_automation_tasks(app_name_internal, package_name, use_case, device_code, log_interval=5, start_activity=None, dry_run=False):
+def run_automation_tasks(app_name_internal, package_name, use_case, device_code, log_interval=5, start_activity=None, dry_run=False, output_dir=None):
     """
     Runs automation tasks for the given package name.
 
@@ -228,6 +229,9 @@ def run_automation_tasks(app_name_internal, package_name, use_case, device_code,
         device_code: Device serial or identifier
         log_interval: Seconds between memory checks
         start_activity: Optional specific activity to launch
+        dry_run: Shorten use case for fast dashboard validation
+        output_dir: Where to write artifacts. Defaults to output/<timestamp>_<use_case>/
+            for single-use-case runs; supplied by run_automation_batch for batch runs.
     """
     run_output_dir = None
     device = None
@@ -238,7 +242,12 @@ def run_automation_tasks(app_name_internal, package_name, use_case, device_code,
         adb = AdbDevice(device_code)
         device = initialize_device(package_name, device_code, start_activity)
         monitoring_finished_event = threading.Event()
-        writer = Writer(adb)
+
+        if output_dir is None:
+            run_timestamp = ExecutionTimestamp.get_timestamp()
+            output_dir = Path(f"output/{run_timestamp}_{use_case}")
+
+        writer = Writer(adb, output_dir=Path(output_dir))
         run_output_dir = writer.get_output_directory()
         memory_tool = MemoryTool(writer, package_name, device, monitoring_finished_event, log_interval, dry_run=dry_run)
 
@@ -249,7 +258,7 @@ def run_automation_tasks(app_name_internal, package_name, use_case, device_code,
         except ImportError:
             logging.debug(f"No shared module for {app_name_internal}; SDK detection disabled")
 
-        print_app_info(device, package_name, use_case, adb, read_about)
+        print_app_info(device, package_name, use_case, adb, read_about, output_dir=run_output_dir)
 
         # Start monitoring after metadata collection.
         monitor_thread = threading.Thread(target=memory_tool.start_monitoring, daemon=True)
@@ -308,6 +317,9 @@ def run_automation_batch(app_name_internal, package_name, device_code, log_inter
         Dictionary with run artifacts and final batch report path
     """
     sequence = use_cases or SYGIC_CORE_BATCH_SEQUENCE
+    batch_timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    batch_dir = Path(f"output/{batch_timestamp}_batch")
+    batch_dir.mkdir(parents=True, exist_ok=True)
     run_artifacts = []
 
     for use_case in sequence:
@@ -321,14 +333,16 @@ def run_automation_batch(app_name_internal, package_name, device_code, log_inter
             log_interval,
             start_activity=start_activity,
             dry_run=dry_run,
+            output_dir=batch_dir / use_case,
         )
         run_artifacts.append(artifacts)
 
-    batch_report = generate_batch_report(run_artifacts, app_name_internal)
+    batch_report = generate_batch_report(run_artifacts, app_name_internal, output_dir=batch_dir)
     archive_result = archive_batch(run_artifacts, app_name_internal)
     return {
         "sequence": sequence,
         "runs": run_artifacts,
         "batch_report": batch_report,
         "archive": archive_result,
+        "batch_dir": batch_dir,
     }
