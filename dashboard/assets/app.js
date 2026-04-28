@@ -8,6 +8,15 @@ function pickMemoryUnit(maxKb) {
   return { name: "MB", divisor: 1024, decimals: 1 };
 }
 
+function useCaseLabel(useCase, descriptions) {
+  const custom = descriptions?.[useCase]?.name;
+  if (custom) return custom;
+  return useCase
+    .split("_")
+    .map((w) => (w ? w.charAt(0).toUpperCase() + w.slice(1) : w))
+    .join(" ");
+}
+
 function compareSdk(a, b) {
   const partsA = a.split(".").map((n) => parseInt(n, 10) || 0);
   const partsB = b.split(".").map((n) => parseInt(n, 10) || 0);
@@ -64,7 +73,7 @@ function renderMapsOverview(descriptions) {
   for (const { useCase, maps } of perUseCase) {
     const li = document.createElement("li");
     const name = document.createElement("strong");
-    name.textContent = useCase.replace(/_/g, " ") + ": ";
+    name.textContent = useCaseLabel(useCase, descriptions) + ": ";
     li.appendChild(name);
     li.appendChild(document.createTextNode(maps.join(", ")));
     ul.appendChild(li);
@@ -126,7 +135,7 @@ function collectUseCases(runs) {
   return Array.from(seen).sort();
 }
 
-async function buildChart(useCase, runs, parent, descriptions) {
+async function buildChart(useCase, runs, parent, descriptions, { hidden = false } = {}) {
   const sortedRuns = [...runs].sort((a, b) => compareSdk(a.sdk, b.sdk));
 
   const rawSeries = [];
@@ -163,7 +172,7 @@ async function buildChart(useCase, runs, parent, descriptions) {
   card.dataset.useCase = useCase;
 
   const title = document.createElement("h2");
-  title.textContent = useCase.replace(/_/g, " ");
+  title.textContent = useCaseLabel(useCase, descriptions);
   card.appendChild(title);
 
   const meta = descriptions?.[useCase];
@@ -185,28 +194,36 @@ async function buildChart(useCase, runs, parent, descriptions) {
     {
       title: { text: "" },
       margin: { t: 10, r: 160, b: 50, l: 70 },
-      xaxis: { title: "Sample", gridcolor: "#e3e6ec" },
-      yaxis: { title: `Total PSS (${unit.name})`, gridcolor: "#e3e6ec", rangemode: "tozero" },
+      font: { family: "system-ui, -apple-system, 'Segoe UI', sans-serif", color: "#5b6370", size: 12 },
+      paper_bgcolor: "rgba(0,0,0,0)",
+      plot_bgcolor: "rgba(255,255,255,0.5)",
+      xaxis: { title: "Sample", gridcolor: "#eef0ee", zerolinecolor: "#e0e3e0" },
+      yaxis: { title: `Total PSS (${unit.name})`, gridcolor: "#eef0ee", zerolinecolor: "#e0e3e0", rangemode: "tozero" },
       hovermode: "x unified",
+      hoverlabel: { bgcolor: "#ffffff", bordercolor: "#0f766e", font: { color: "#1a1f2a" } },
       legend: {
         orientation: "v",
         x: 1.02,
         y: 1,
         xanchor: "left",
         yanchor: "top",
-        title: { text: "<b>SDK</b>", font: { size: 13 } },
+        title: { text: "<b>SDK</b>", font: { size: 12, color: "#0f766e" } },
         font: { size: 12 },
-        bgcolor: "rgba(255,255,255,0.9)",
-        bordercolor: "#e3e6ec",
+        bgcolor: "rgba(255,255,255,0.92)",
+        bordercolor: "#e8e4da",
         borderwidth: 1,
         itemclick: "toggle",
         itemdoubleclick: "toggleothers",
       },
-      plot_bgcolor: "#fbfcfd",
-      paper_bgcolor: "#ffffff",
+      colorway: [
+        "#4e79a7", "#f28e2c", "#e15759", "#76b7b2",
+        "#59a14f", "#edc949", "#af7aa1", "#ff9da7",
+      ],
     },
     { responsive: true, displaylogo: false }
   );
+
+  if (hidden) card.hidden = true;
 }
 
 async function main() {
@@ -239,24 +256,30 @@ async function main() {
   summary.textContent = `${sdkList.length} SDK versions: ${sdkList.join(", ")}`;
 
   const useCases = collectUseCases(runs);
-  for (const useCase of useCases) {
-    await buildChart(useCase, runs, charts, descriptions);
-  }
-
-  initTabs(useCases);
+  initTabs(useCases, runs, charts, descriptions);
 }
 
-function initTabs(useCases) {
+function initTabs(useCases, runs, charts, descriptions) {
   const tabs = document.getElementById("use-case-tabs");
   if (!tabs || !useCases.length) return;
-  const cards = document.querySelectorAll("#charts .chart-card");
-  if (!cards.length) return;
 
-  function activate(useCase) {
-    tabs.querySelectorAll("button").forEach((btn) => {
-      btn.classList.toggle("active", btn.dataset.useCase === useCase);
-    });
-    cards.forEach((card) => {
+  const built = new Set();
+  const inProgress = new Map();
+  let activeUseCase = null;
+
+  function ensureBuilt(useCase, hidden) {
+    if (built.has(useCase)) return Promise.resolve();
+    if (inProgress.has(useCase)) return inProgress.get(useCase);
+    const p = buildChart(useCase, runs, charts, descriptions, { hidden })
+      .then(() => { built.add(useCase); })
+      .catch((err) => { console.error(err); })
+      .finally(() => { inProgress.delete(useCase); });
+    inProgress.set(useCase, p);
+    return p;
+  }
+
+  function showOnly(useCase) {
+    document.querySelectorAll("#charts .chart-card").forEach((card) => {
       const visible = card.dataset.useCase === useCase;
       card.hidden = !visible;
       if (visible) {
@@ -266,17 +289,33 @@ function initTabs(useCases) {
     });
   }
 
+  async function activate(useCase) {
+    activeUseCase = useCase;
+    tabs.querySelectorAll("button").forEach((btn) => {
+      btn.classList.toggle("active", btn.dataset.useCase === useCase);
+    });
+    await ensureBuilt(useCase, false);
+    if (activeUseCase === useCase) showOnly(useCase);
+  }
+
+  async function preloadRemaining() {
+    for (const useCase of useCases) {
+      if (built.has(useCase) || inProgress.has(useCase)) continue;
+      await ensureBuilt(useCase, true);
+    }
+  }
+
   for (const useCase of useCases) {
     const btn = document.createElement("button");
     btn.type = "button";
     btn.dataset.useCase = useCase;
-    btn.textContent = useCase.replace(/_/g, " ");
+    btn.textContent = useCaseLabel(useCase, descriptions);
     btn.addEventListener("click", () => activate(useCase));
     tabs.appendChild(btn);
   }
 
   tabs.hidden = false;
-  activate(useCases[0]);
+  activate(useCases[0]).then(preloadRemaining);
 }
 
 main().catch((err) => {

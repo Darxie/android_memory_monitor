@@ -28,13 +28,14 @@ The GUI device dropdown lists every device returned by `adb devices`. The select
 
 ## Use cases (Sygic Profi)
 
-| Use case      | What it does |
-|---------------|--------------|
-| `compute`     | Searches for a destination, computes a route, presses back. Repeats. |
-| `search`      | Two POI searches in different countries, taps results, returns to typing. Repeats. |
-| `fg_bg`       | Switches the app to background (Calendar) and back. Stress-tests foreground/background lifecycle. |
-| `zoom`        | Searches Mt. Everest, zooms out 20× then in 20×. Repeats. |
-| `demonstrate` | Computes a long route and runs Demonstrate route, with arrival watchers and a 12-hour safety timeout. |
+| Use case             | What it does |
+|----------------------|--------------|
+| `compute`            | Searches for a destination, computes a route, presses back. Repeats. |
+| `search`             | Two POI searches in different countries, taps results, returns to typing. Repeats. |
+| `fg_bg`              | Switches the app to background (Calendar) and back. Stress-tests foreground/background lifecycle. |
+| `zoom`               | Searches Mt. Everest, zooms out 20× then in 20×. Repeats. |
+| `demonstrate`        | Computes a long route and runs Demonstrate route for a fixed duration (12h full / 5min dry-run). |
+| `recompute_offroute` | Drives the Mock Locations app (`ru.gavrikov.mocklocations`) over a saved route that pulls the GPS feed off the planned path, forcing constant recomputes. 10-hour stress test. |
 
 Use case descriptions visible in the dashboard live in `dashboard/data/use_cases.json` and can be edited without touching code.
 
@@ -64,7 +65,11 @@ python dashboard/serve.py
 
 This serves `dashboard/` on `http://localhost:8000` (browsers block `fetch()` from `file://`, so `index.html` won't work when opened directly).
 
-The dashboard renders one Plotly chart per use case, with one line per SDK version, sorted by semver. Click a SDK in the legend to toggle it on or off.
+The dashboard renders one Plotly chart per use case, with one line per SDK version (semver-sorted, oldest → newest). Each use case has its own tab — click a tab at the top to switch between them; charts are pre-loaded in the background after the first one renders, so subsequent tab switches are instant.
+
+By default only the **5 most recent SDKs** are shown as solid lines. Older versions stay in the legend faded out (`visible: 'legendonly'`); click a legend entry to toggle visibility.
+
+The dashboard ships with historical data backfilled from earlier manual runs (SDKs 25.7.0, 25.9.9, 28.1.11, 28.2.0, 28.3.3) alongside the recent captures from the live tooling — sample counts are normalized to the most recent SDK so traces overlay cleanly.
 
 ## Publish to feldis.cz over FTP
 

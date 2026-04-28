@@ -8,6 +8,7 @@
     "description": "Searches for \"market horlbeck\" (Charleston), \"kam kreta ayer\" (Singapore) and \"duomo di milano\" (Milan), each time selecting the first result and tapping X to return to typing.\n\nRepeats 100×."
   },
   "fg_bg": {
+    "name": "Foreground to Background",
     "description": "Opens com.google.android.calendar via `adb shell monkey`, sleeps for 25 seconds, then brings com.sygic.profi.beta back to the foreground via `adb shell am start ... NaviNativeActivity`.\n\nRepeats 100×."
   },
   "zoom": {
