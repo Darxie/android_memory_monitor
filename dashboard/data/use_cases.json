@@ -17,5 +17,9 @@
   "demonstrate": {
     "maps": "Slovakia, Austria, Germany",
     "description": "Searches for coordinates near Düsseldorf (Germany), computes a long route, presses Demonstrate route, and lets the simulated drive run for a fixed duration before cancelling."
+  },
+  "recompute_offroute": {
+    "maps": "Slovakia, Austria, Germany, France, Spain",
+    "description": "Computes a long route from the device's location to Paris, then starts a Mock Locations saved-route preset that pulls the GPS feed backwards across the planned route. The constant off-route position forces Sygic to repeatedly recompute, exercising the recompute memory paths.\n\nRequires the Mock Locations app (ru.gavrikov.mocklocations) configured with a saved route, and Developer Options → Select mock location app → Mock Locations.\n\nRuns for 10 hours."
   }
 }

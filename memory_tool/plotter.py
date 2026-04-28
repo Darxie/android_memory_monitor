@@ -20,7 +20,6 @@ from memory_tool.timestamp import ExecutionTimestamp
 
 timestamp = ExecutionTimestamp.get_timestamp()
 directory = Path(f"output/{timestamp}")
-directory.mkdir(parents=True, exist_ok=True)
 
 IMAGE_STACKED_MEMORY = directory / f"memory_stacked_line_chart_{timestamp}.png"
 IMAGE_TOTAL_MEMORY = directory / f"memory_total_{timestamp}.png"

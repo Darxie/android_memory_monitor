@@ -25,6 +25,84 @@
         "zoom": "data/runs/20260427_092610_sdk28.4.14/zoom.csv",
         "demonstrate": "data/runs/20260427_092610_sdk28.4.14/demonstrate.csv"
       }
+    },
+    {
+      "id": "20260428_080241_sdk35.0.0",
+      "sdk": "35.0.0",
+      "date": "2026-04-28T08:02:41",
+      "app": "sygic_profi",
+      "use_cases": {
+        "compute": "data/runs/20260428_080241_sdk35.0.0/compute.csv",
+        "search": "data/runs/20260428_080241_sdk35.0.0/search.csv",
+        "fg_bg": "data/runs/20260428_080241_sdk35.0.0/fg_bg.csv",
+        "zoom": "data/runs/20260428_080241_sdk35.0.0/zoom.csv",
+        "demonstrate": "data/runs/20260428_080241_sdk35.0.0/demonstrate.csv"
+      }
+    },
+    {
+      "id": "20250901_090000_sdk25.7.0",
+      "sdk": "25.7.0",
+      "date": "2025-09-01T09:00:00",
+      "app": "sygic_profi",
+      "use_cases": {
+        "compute": "data/runs/20250901_090000_sdk25.7.0/compute.csv",
+        "demonstrate": "data/runs/20250901_090000_sdk25.7.0/demonstrate.csv",
+        "fg_bg": "data/runs/20250901_090000_sdk25.7.0/fg_bg.csv",
+        "search": "data/runs/20250901_090000_sdk25.7.0/search.csv",
+        "zoom": "data/runs/20250901_090000_sdk25.7.0/zoom.csv"
+      }
+    },
+    {
+      "id": "20251101_090000_sdk25.9.9",
+      "sdk": "25.9.9",
+      "date": "2025-11-01T09:00:00",
+      "app": "sygic_profi",
+      "use_cases": {
+        "compute": "data/runs/20251101_090000_sdk25.9.9/compute.csv",
+        "demonstrate": "data/runs/20251101_090000_sdk25.9.9/demonstrate.csv",
+        "fg_bg": "data/runs/20251101_090000_sdk25.9.9/fg_bg.csv",
+        "search": "data/runs/20251101_090000_sdk25.9.9/search.csv",
+        "zoom": "data/runs/20251101_090000_sdk25.9.9/zoom.csv"
+      }
+    },
+    {
+      "id": "20251215_090000_sdk28.1.11",
+      "sdk": "28.1.11",
+      "date": "2025-12-15T09:00:00",
+      "app": "sygic_profi",
+      "use_cases": {
+        "compute": "data/runs/20251215_090000_sdk28.1.11/compute.csv",
+        "demonstrate": "data/runs/20251215_090000_sdk28.1.11/demonstrate.csv",
+        "fg_bg": "data/runs/20251215_090000_sdk28.1.11/fg_bg.csv",
+        "search": "data/runs/20251215_090000_sdk28.1.11/search.csv",
+        "zoom": "data/runs/20251215_090000_sdk28.1.11/zoom.csv"
+      }
+    },
+    {
+      "id": "20260201_090000_sdk28.2.0",
+      "sdk": "28.2.0",
+      "date": "2026-02-01T09:00:00",
+      "app": "sygic_profi",
+      "use_cases": {
+        "compute": "data/runs/20260201_090000_sdk28.2.0/compute.csv",
+        "demonstrate": "data/runs/20260201_090000_sdk28.2.0/demonstrate.csv",
+        "fg_bg": "data/runs/20260201_090000_sdk28.2.0/fg_bg.csv",
+        "search": "data/runs/20260201_090000_sdk28.2.0/search.csv",
+        "zoom": "data/runs/20260201_090000_sdk28.2.0/zoom.csv"
+      }
+    },
+    {
+      "id": "20260415_090000_sdk28.3.3",
+      "sdk": "28.3.3",
+      "date": "2026-04-15T09:00:00",
+      "app": "sygic_profi",
+      "use_cases": {
+        "compute": "data/runs/20260415_090000_sdk28.3.3/compute.csv",
+        "demonstrate": "data/runs/20260415_090000_sdk28.3.3/demonstrate.csv",
+        "fg_bg": "data/runs/20260415_090000_sdk28.3.3/fg_bg.csv",
+        "search": "data/runs/20260415_090000_sdk28.3.3/search.csv",
+        "zoom": "data/runs/20260415_090000_sdk28.3.3/zoom.csv"
+      }
     }
   ]
 }

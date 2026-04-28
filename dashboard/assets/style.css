@@ -89,6 +89,40 @@ h1 {
   font-weight: 600;
 }
 
+.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 6px;
+  margin-bottom: 16px;
+}
+
+.tabs button {
+  padding: 8px 16px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.95rem;
+  color: var(--muted);
+  text-transform: capitalize;
+  font-family: inherit;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+
+.tabs button:hover:not(.active) {
+  background: rgba(15, 118, 110, 0.08);
+  color: var(--ink);
+}
+
+.tabs button.active {
+  background: var(--accent);
+  color: #fff;
+}
+
 .chart-card {
   background: var(--card);
   border: 1px solid var(--line);

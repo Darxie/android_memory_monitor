@@ -25,6 +25,7 @@ APPLICATIONS = {
             "freedrive",
             "demon_fg_bg",
             "recompute",
+            "recompute_offroute",
         ],
     },
     "EW Navi": {

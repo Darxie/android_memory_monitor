@@ -147,17 +147,20 @@ async function buildChart(useCase, runs, parent, descriptions) {
   if (!rawSeries.length) return;
 
   const unit = pickMemoryUnit(maxKb);
-  const traces = rawSeries.map(({ sdk, totals }) => ({
+  const visibleFromIdx = Math.max(0, rawSeries.length - 5);
+  const traces = rawSeries.map(({ sdk, totals }, idx) => ({
     x: totals.map((_, i) => i + 1),
     y: totals.map((v) => v / unit.divisor),
     mode: "lines",
     name: sdk,
     line: { width: 2 },
+    visible: idx >= visibleFromIdx ? true : "legendonly",
     hovertemplate: `<b>SDK ${sdk}</b><br>sample %{x}<br>%{y:,.${unit.decimals}f} ${unit.name}<extra></extra>`,
   }));
 
   const card = document.createElement("article");
   card.className = "chart-card";
+  card.dataset.useCase = useCase;
 
   const title = document.createElement("h2");
   title.textContent = useCase.replace(/_/g, " ");
@@ -239,6 +242,41 @@ async function main() {
   for (const useCase of useCases) {
     await buildChart(useCase, runs, charts, descriptions);
   }
+
+  initTabs(useCases);
+}
+
+function initTabs(useCases) {
+  const tabs = document.getElementById("use-case-tabs");
+  if (!tabs || !useCases.length) return;
+  const cards = document.querySelectorAll("#charts .chart-card");
+  if (!cards.length) return;
+
+  function activate(useCase) {
+    tabs.querySelectorAll("button").forEach((btn) => {
+      btn.classList.toggle("active", btn.dataset.useCase === useCase);
+    });
+    cards.forEach((card) => {
+      const visible = card.dataset.useCase === useCase;
+      card.hidden = !visible;
+      if (visible) {
+        const plotDiv = card.querySelector(".plotly-target");
+        if (plotDiv && window.Plotly) Plotly.Plots.resize(plotDiv);
+      }
+    });
+  }
+
+  for (const useCase of useCases) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.dataset.useCase = useCase;
+    btn.textContent = useCase.replace(/_/g, " ");
+    btn.addEventListener("click", () => activate(useCase));
+    tabs.appendChild(btn);
+  }
+
+  tabs.hidden = false;
+  activate(useCases[0]);
 }
 
 main().catch((err) => {
