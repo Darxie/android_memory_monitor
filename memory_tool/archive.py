@@ -87,20 +87,37 @@ def archive_batch(run_artifacts: list[dict], app_name_internal: str) -> Optional
     dest_dir = DASHBOARD_RUNS_DIR / batch_id
     dest_dir.mkdir(parents=True, exist_ok=True)
 
-    use_case_files: dict[str, str] = {}
+    # use_cases values are either a string CSV path (flat use case) or a
+    # dict mapping variant key -> CSV path (variant-aware, e.g. zoom).
+    use_case_files: dict[str, object] = {}
     for run in run_artifacts:
         use_case = run.get("use_case")
         csv_path = run.get("csv")
+        location = run.get("location")
         if not use_case or not csv_path:
             continue
         csv_path = Path(csv_path)
         if not csv_path.exists():
             continue
 
-        dest_csv = dest_dir / f"{use_case}.csv"
+        if location:
+            dest_csv_name = f"{use_case}_{location}.csv"
+        else:
+            dest_csv_name = f"{use_case}.csv"
+        dest_csv = dest_dir / dest_csv_name
         shutil.copy(csv_path, dest_csv)
         # Use forward slashes so the path is valid in HTML fetch() calls on any OS.
-        use_case_files[use_case] = f"data/runs/{batch_id}/{use_case}.csv"
+        relative = f"data/runs/{batch_id}/{dest_csv_name}"
+
+        if location:
+            entry = use_case_files.setdefault(use_case, {})
+            if not isinstance(entry, dict):
+                # A flat entry already exists — promote to dict and keep both.
+                entry = {"_default": entry}
+                use_case_files[use_case] = entry
+            entry[location] = relative
+        else:
+            use_case_files[use_case] = relative
 
     if not use_case_files:
         logging.warning("No CSVs to archive for SDK %s; cleaning up empty directory", sdk)

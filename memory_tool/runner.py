@@ -1,5 +1,6 @@
 from pathlib import Path
 from datetime import datetime
+from typing import Optional
 import sys
 import logging
 import threading
@@ -22,18 +23,56 @@ from memory_tool.archive import archive_batch
 from memory_tool.reporter import generate_batch_report, collect_run_artifacts
 from memory_tool.use_cases.protocol import validate as validate_use_case
 
-# Set up logging configuration
-logging.basicConfig(
-    level=logging.DEBUG,
-    format="%(asctime)s - %(levelname)s - %(message)s",
-    handlers=[
-        logging.FileHandler("python_run_log.txt"),
-        logging.StreamHandler()
-    ]
-)
-logging.getLogger('matplotlib').setLevel(logging.WARNING)
 
-SYGIC_CORE_BATCH_SEQUENCE = ["compute", "search", "fg_bg", "zoom", "demonstrate"]
+def setup_logging(log_path: Optional[Path] = None, level: int = logging.DEBUG) -> None:
+    """
+    Configure the root logger. Each call replaces existing handlers (force=True),
+    so a batch can route its logs to a fresh file inside its own output directory.
+    Without log_path, logs go only to stdout.
+    """
+    handlers: list[logging.Handler] = [logging.StreamHandler()]
+    if log_path is not None:
+        log_path = Path(log_path)
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        handlers.append(logging.FileHandler(log_path, encoding="utf-8"))
+
+    logging.basicConfig(
+        level=level,
+        format="%(asctime)s - %(levelname)s - %(message)s",
+        handlers=handlers,
+        force=True,
+    )
+    logging.getLogger("matplotlib").setLevel(logging.WARNING)
+
+SYGIC_CORE_BATCH_SEQUENCE = [
+    "compute",
+    "search",
+    "fg_bg",
+    ("zoom", "nepal"),
+    ("zoom", "paris"),
+    "demonstrate",
+    "recompute_offroute",
+]
+
+
+def normalize_sequence_entry(entry):
+    """Convert a sequence entry to a (use_case, location) tuple. location may be None."""
+    if isinstance(entry, str):
+        return entry, None
+    if isinstance(entry, tuple) and len(entry) == 2:
+        return entry[0], entry[1]
+    raise ValueError(f"Invalid sequence entry: {entry!r}")
+
+
+def format_sequence_entry(entry) -> str:
+    """Return display label for a sequence entry (e.g. 'zoom/paris')."""
+    use_case, location = normalize_sequence_entry(entry)
+    return use_case if location is None else f"{use_case}/{location}"
+
+
+def format_sequence(sequence) -> str:
+    """Return ' -> ' joined display labels for a sequence."""
+    return " -> ".join(format_sequence_entry(e) for e in sequence)
 UIAUTOMATOR_CONNECT_ATTEMPTS = 3
 UIAUTOMATOR_RECOVERY_WAIT_SECONDS = 1
 DEVICE_READY_TIMEOUT_SECONDS = 120
@@ -218,7 +257,7 @@ def initialize_device(package_name, device_code, start_activity=None):
             raise
 
 
-def run_automation_tasks(app_name_internal, package_name, use_case, device_code, log_interval=5, start_activity=None, dry_run=False, output_dir=None):
+def run_automation_tasks(app_name_internal, package_name, use_case, device_code, log_interval=5, start_activity=None, dry_run=False, output_dir=None, location=None):
     """
     Runs automation tasks for the given package name.
 
@@ -232,6 +271,7 @@ def run_automation_tasks(app_name_internal, package_name, use_case, device_code,
         dry_run: Shorten use case for fast dashboard validation
         output_dir: Where to write artifacts. Defaults to output/<timestamp>_<use_case>/
             for single-use-case runs; supplied by run_automation_batch for batch runs.
+        location: Variant key for variant-aware use cases. Passed to run_test.
     """
     run_output_dir = None
     device = None
@@ -243,9 +283,12 @@ def run_automation_tasks(app_name_internal, package_name, use_case, device_code,
         device = initialize_device(package_name, device_code, start_activity)
         monitoring_finished_event = threading.Event()
 
+        owns_logging = output_dir is None
         if output_dir is None:
             run_timestamp = ExecutionTimestamp.get_timestamp()
             output_dir = Path(f"output/{run_timestamp}_{use_case}")
+        if owns_logging:
+            setup_logging(Path(output_dir) / "python_run_log.txt")
 
         writer = Writer(adb, output_dir=Path(output_dir))
         run_output_dir = writer.get_output_directory()
@@ -271,7 +314,10 @@ def run_automation_tasks(app_name_internal, package_name, use_case, device_code,
             logging.info(f"Loading use case module: {module_name}")
             use_case_module = importlib.import_module(module_name)
             validate_use_case(use_case_module)
-            use_case_module.run_test(device, memory_tool)
+            if location is not None:
+                use_case_module.run_test(device, memory_tool, location=location)
+            else:
+                use_case_module.run_test(device, memory_tool)
         except ImportError as e:
             logging.error(f"Failed to load use case module: {e}", exc_info=True)
             raise
@@ -297,8 +343,11 @@ def run_automation_tasks(app_name_internal, package_name, use_case, device_code,
             device.app_stop(package_name)
 
     if run_output_dir:
-        return collect_run_artifacts(run_output_dir, use_case)
-    return {"use_case": use_case, "output_dir": None}
+        artifacts = collect_run_artifacts(run_output_dir, use_case)
+        if location is not None:
+            artifacts["location"] = location
+        return artifacts
+    return {"use_case": use_case, "output_dir": None, "location": location}
 
 
 def run_automation_batch(app_name_internal, package_name, device_code, log_interval=5, start_activity=None, use_cases=None, dry_run=False):
@@ -320,10 +369,13 @@ def run_automation_batch(app_name_internal, package_name, device_code, log_inter
     batch_timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     batch_dir = Path(f"output/{batch_timestamp}_batch")
     batch_dir.mkdir(parents=True, exist_ok=True)
+    setup_logging(batch_dir / "python_run_log.txt")
     run_artifacts = []
 
-    for use_case in sequence:
-        logging.info(f"Starting batch use-case: {use_case}")
+    for entry in sequence:
+        use_case, location = normalize_sequence_entry(entry)
+        sub_dir_name = use_case if location is None else f"{use_case}_{location}"
+        logging.info(f"Starting batch use-case: {format_sequence_entry(entry)}")
         ExecutionTimestamp.reset()
         artifacts = run_automation_tasks(
             app_name_internal,
@@ -333,7 +385,8 @@ def run_automation_batch(app_name_internal, package_name, device_code, log_inter
             log_interval,
             start_activity=start_activity,
             dry_run=dry_run,
-            output_dir=batch_dir / use_case,
+            output_dir=batch_dir / sub_dir_name,
+            location=location,
         )
         run_artifacts.append(artifacts)
 

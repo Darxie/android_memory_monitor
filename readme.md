@@ -20,7 +20,7 @@ Targets two apps today: **Sygic Profi** and **EW Navi**.
    python -m memory_tool.gui
    ```
 4. Pick device, app, build version (release/debug), log interval
-5. Click a use case button to run a single scenario, or **Run Batch** to run the full Sygic core sequence (`compute → search → fg_bg → zoom → demonstrate`)
+5. Click a use case button to run a single scenario, or **Run Batch** to run the full Sygic core sequence (`compute → search → fg_bg → zoom (Nepal) → zoom (Paris) → demonstrate → recompute_offroute`). Above the batch buttons you can tick/untick individual entries, including each zoom variant.
 
 ## Multiple connected devices
 
@@ -33,7 +33,7 @@ The GUI device dropdown lists every device returned by `adb devices`. The select
 | `compute`            | Searches for a destination, computes a route, presses back. Repeats. |
 | `search`             | Two POI searches in different countries, taps results, returns to typing. Repeats. |
 | `fg_bg`              | Switches the app to background (Calendar) and back. Stress-tests foreground/background lifecycle. |
-| `zoom`               | Searches Mt. Everest, zooms out 20× then in 20×. Repeats. |
+| `zoom`               | Variant-aware: navigates to a chosen location (Nepal / Mt. Everest, Paris / Tour Eiffel, …) and zooms out 20× then in 20×. The GUI ticks which variants to include in the batch; each variant runs as its own sequential run with its own CSV. |
 | `demonstrate`        | Computes a long route and runs Demonstrate route for a fixed duration (12h full / 5min dry-run). |
 | `recompute_offroute` | Drives the Mock Locations app (`ru.gavrikov.mocklocations`) over a saved route that pulls the GPS feed off the planned path, forcing constant recomputes. 10-hour stress test. |
 
@@ -68,6 +68,8 @@ This serves `dashboard/` on `http://localhost:8000` (browsers block `fetch()` fr
 The dashboard renders one Plotly chart per use case, with one line per SDK version (semver-sorted, oldest → newest). Each use case has its own tab — click a tab at the top to switch between them; charts are pre-loaded in the background after the first one renders, so subsequent tab switches are instant.
 
 By default only the **5 most recent SDKs** are shown as solid lines. Older versions stay in the legend faded out (`visible: 'legendonly'`); click a legend entry to toggle visibility.
+
+Variant-aware use cases (currently `zoom`) render a "Location:" selector inside the chart card; pick a location to view that variant's lines. Variants are declared in `dashboard/data/use_cases.json` under `<use_case>.variants` and stored in the manifest as `"<use_case>": {"<variant>": "<csv_path>", ...}`.
 
 The dashboard ships with historical data backfilled from earlier manual runs (SDKs 25.7.0, 25.9.9, 28.1.11, 28.2.0, 28.3.3) alongside the recent captures from the live tooling — sample counts are normalized to the most recent SDK so traces overlay cleanly.
 
@@ -123,6 +125,16 @@ dashboard/
 
 publish.py           # FTP uploader for the dashboard
 ```
+
+## Tests
+
+```
+pytest
+```
+
+Unit tests for `archive.py`, `app_info.py`, `plotter.py` and the use case
+protocol live in `tests/`. They use `tmp_path` fixtures and don't require a
+connected Android device.
 
 ## Why PSS instead of RSS
 

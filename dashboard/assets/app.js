@@ -45,6 +45,17 @@ async function loadUseCaseDescriptions() {
   }
 }
 
+function aggregateMaps(meta) {
+  const all = new Set();
+  if (meta?.maps) meta.maps.split(",").forEach((m) => all.add(m.trim()));
+  if (meta?.variants) {
+    for (const v of Object.values(meta.variants)) {
+      if (v?.maps) v.maps.split(",").forEach((m) => all.add(m.trim()));
+    }
+  }
+  return [...all].filter(Boolean);
+}
+
 function renderMapsOverview(descriptions) {
   const overview = document.getElementById("maps-overview");
   if (!overview) return;
@@ -52,8 +63,7 @@ function renderMapsOverview(descriptions) {
   const allMaps = new Set();
   const perUseCase = [];
   for (const [useCase, meta] of Object.entries(descriptions || {})) {
-    if (!meta?.maps) continue;
-    const maps = meta.maps.split(",").map((s) => s.trim()).filter(Boolean);
+    const maps = aggregateMaps(meta);
     if (!maps.length) continue;
     perUseCase.push({ useCase, maps });
     maps.forEach((m) => allMaps.add(m));
@@ -82,17 +92,18 @@ function renderMapsOverview(descriptions) {
   overview.hidden = false;
 }
 
-function renderDescription(meta) {
+function renderDescription(meta, variantMeta = null) {
   const wrap = document.createElement("div");
   wrap.className = "description";
 
-  if (meta.maps) {
+  const mapsValue = variantMeta?.maps || meta.maps;
+  if (mapsValue) {
     const maps = document.createElement("p");
     maps.className = "maps";
     const label = document.createElement("strong");
     label.textContent = "Necessary maps: ";
     maps.appendChild(label);
-    maps.appendChild(document.createTextNode(meta.maps));
+    maps.appendChild(document.createTextNode(mapsValue));
     wrap.appendChild(maps);
   }
 
@@ -102,6 +113,13 @@ function renderDescription(meta) {
       p.textContent = para;
       wrap.appendChild(p);
     }
+  }
+
+  if (variantMeta?.description) {
+    const note = document.createElement("p");
+    note.className = "variant-note";
+    note.textContent = variantMeta.description;
+    wrap.appendChild(note);
   }
 
   return wrap;
@@ -135,13 +153,69 @@ function collectUseCases(runs) {
   return Array.from(seen).sort();
 }
 
-async function buildChart(useCase, runs, parent, descriptions, { hidden = false } = {}) {
+function getCsvPath(run, useCase, variant) {
+  const entry = run.use_cases?.[useCase];
+  if (entry == null) return null;
+  if (typeof entry === "string") {
+    // Flat use case (or legacy data): only matched when no variant is requested.
+    return variant == null ? entry : null;
+  }
+  if (variant && entry[variant]) return entry[variant];
+  return null;
+}
+
+function collectVariantKeys(useCase, runs, descriptions) {
+  const variants = new Set();
+  for (const run of runs) {
+    const entry = run.use_cases?.[useCase];
+    if (entry && typeof entry === "object") {
+      Object.keys(entry).forEach((k) => variants.add(k));
+    }
+  }
+  const declared = descriptions?.[useCase]?.variants;
+  if (declared) Object.keys(declared).forEach((k) => variants.add(k));
+  return [...variants];
+}
+
+function plotlyLayout(unit) {
+  return {
+    title: { text: "" },
+    margin: { t: 10, r: 160, b: 50, l: 70 },
+    font: { family: "system-ui, -apple-system, 'Segoe UI', sans-serif", color: "#5b6370", size: 12 },
+    paper_bgcolor: "rgba(0,0,0,0)",
+    plot_bgcolor: "rgba(255,255,255,0.5)",
+    xaxis: { title: "Sample", gridcolor: "#eef0ee", zerolinecolor: "#e0e3e0" },
+    yaxis: { title: `Total PSS (${unit.name})`, gridcolor: "#eef0ee", zerolinecolor: "#e0e3e0", rangemode: "tozero" },
+    hovermode: "x unified",
+    hoverlabel: { bgcolor: "#ffffff", bordercolor: "#0f766e", font: { color: "#1a1f2a" } },
+    legend: {
+      orientation: "v",
+      x: 1.02,
+      y: 1,
+      xanchor: "left",
+      yanchor: "top",
+      title: { text: "<b>SDK</b>", font: { size: 12, color: "#0f766e" } },
+      font: { size: 12 },
+      bgcolor: "rgba(255,255,255,0.92)",
+      bordercolor: "#e8e4da",
+      borderwidth: 1,
+      itemclick: "toggle",
+      itemdoubleclick: "toggleothers",
+    },
+    colorway: [
+      "#4e79a7", "#f28e2c", "#e15759", "#76b7b2",
+      "#59a14f", "#edc949", "#af7aa1", "#ff9da7",
+    ],
+  };
+}
+
+async function renderChartFor(plotDiv, sdksEl, useCase, runs, variant) {
   const sortedRuns = [...runs].sort((a, b) => compareSdk(a.sdk, b.sdk));
 
   const rawSeries = [];
   let maxKb = 0;
   for (const run of sortedRuns) {
-    const csvPath = run.use_cases?.[useCase];
+    const csvPath = getCsvPath(run, useCase, variant);
     if (!csvPath) continue;
     try {
       const totals = await loadCsvTotalMemory(csvPath);
@@ -153,7 +227,11 @@ async function buildChart(useCase, runs, parent, descriptions, { hidden = false 
     }
   }
 
-  if (!rawSeries.length) return;
+  if (!rawSeries.length) {
+    sdksEl.textContent = "No data for this selection.";
+    if (window.Plotly) Plotly.purge(plotDiv);
+    return;
+  }
 
   const unit = pickMemoryUnit(maxKb);
   const visibleFromIdx = Math.max(0, rawSeries.length - 5);
@@ -167,6 +245,22 @@ async function buildChart(useCase, runs, parent, descriptions, { hidden = false 
     hovertemplate: `<b>SDK ${sdk}</b><br>sample %{x}<br>%{y:,.${unit.decimals}f} ${unit.name}<extra></extra>`,
   }));
 
+  sdksEl.textContent = `SDKs: ${rawSeries.map((s) => s.sdk).join(", ")}`;
+
+  Plotly.newPlot(
+    plotDiv,
+    traces,
+    plotlyLayout(unit),
+    { responsive: true, displaylogo: false }
+  );
+}
+
+async function buildChart(useCase, runs, parent, descriptions, { hidden = false } = {}) {
+  const meta = descriptions?.[useCase] || {};
+  const variantKeys = collectVariantKeys(useCase, runs, descriptions);
+  const isVariantAware = variantKeys.length > 0;
+  const declaredVariants = meta.variants || {};
+
   const card = document.createElement("article");
   card.className = "chart-card";
   card.dataset.useCase = useCase;
@@ -175,53 +269,50 @@ async function buildChart(useCase, runs, parent, descriptions, { hidden = false 
   title.textContent = useCaseLabel(useCase, descriptions);
   card.appendChild(title);
 
-  const meta = descriptions?.[useCase];
-  if (meta) card.appendChild(renderDescription(meta));
+  let selectedVariant = isVariantAware ? variantKeys[0] : null;
+  let descriptionEl = renderDescription(meta, selectedVariant ? declaredVariants[selectedVariant] : null);
+  card.appendChild(descriptionEl);
 
-  const sdks = document.createElement("p");
-  sdks.className = "sdks";
-  sdks.textContent = `SDKs: ${traces.map((t) => t.name).join(", ")}`;
-  card.appendChild(sdks);
+  if (isVariantAware) {
+    const selector = document.createElement("div");
+    selector.className = "variant-selector";
+    const labelEl = document.createElement("span");
+    labelEl.className = "variant-selector-label";
+    labelEl.textContent = "Location:";
+    selector.appendChild(labelEl);
+
+    for (const variant of variantKeys) {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.dataset.variant = variant;
+      btn.textContent = declaredVariants[variant]?.label || variant;
+      if (variant === selectedVariant) btn.classList.add("active");
+      btn.addEventListener("click", async () => {
+        if (selectedVariant === variant) return;
+        selectedVariant = variant;
+        selector.querySelectorAll("button").forEach((b) =>
+          b.classList.toggle("active", b.dataset.variant === variant)
+        );
+        const newDescEl = renderDescription(meta, declaredVariants[variant]);
+        descriptionEl.replaceWith(newDescEl);
+        descriptionEl = newDescEl;
+        await renderChartFor(plotDiv, sdksEl, useCase, runs, variant);
+      });
+      selector.appendChild(btn);
+    }
+    card.appendChild(selector);
+  }
+
+  const sdksEl = document.createElement("p");
+  sdksEl.className = "sdks";
+  card.appendChild(sdksEl);
 
   const plotDiv = document.createElement("div");
   plotDiv.className = "plotly-target";
   card.appendChild(plotDiv);
   parent.appendChild(card);
 
-  Plotly.newPlot(
-    plotDiv,
-    traces,
-    {
-      title: { text: "" },
-      margin: { t: 10, r: 160, b: 50, l: 70 },
-      font: { family: "system-ui, -apple-system, 'Segoe UI', sans-serif", color: "#5b6370", size: 12 },
-      paper_bgcolor: "rgba(0,0,0,0)",
-      plot_bgcolor: "rgba(255,255,255,0.5)",
-      xaxis: { title: "Sample", gridcolor: "#eef0ee", zerolinecolor: "#e0e3e0" },
-      yaxis: { title: `Total PSS (${unit.name})`, gridcolor: "#eef0ee", zerolinecolor: "#e0e3e0", rangemode: "tozero" },
-      hovermode: "x unified",
-      hoverlabel: { bgcolor: "#ffffff", bordercolor: "#0f766e", font: { color: "#1a1f2a" } },
-      legend: {
-        orientation: "v",
-        x: 1.02,
-        y: 1,
-        xanchor: "left",
-        yanchor: "top",
-        title: { text: "<b>SDK</b>", font: { size: 12, color: "#0f766e" } },
-        font: { size: 12 },
-        bgcolor: "rgba(255,255,255,0.92)",
-        bordercolor: "#e8e4da",
-        borderwidth: 1,
-        itemclick: "toggle",
-        itemdoubleclick: "toggleothers",
-      },
-      colorway: [
-        "#4e79a7", "#f28e2c", "#e15759", "#76b7b2",
-        "#59a14f", "#edc949", "#af7aa1", "#ff9da7",
-      ],
-    },
-    { responsive: true, displaylogo: false }
-  );
+  await renderChartFor(plotDiv, sdksEl, useCase, runs, selectedVariant);
 
   if (hidden) card.hidden = true;
 }

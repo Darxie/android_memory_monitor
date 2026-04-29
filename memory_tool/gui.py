@@ -1,8 +1,9 @@
 from pathlib import Path
+import importlib
 import sys
 import tkinter as tk
 from tkinter import ttk, messagebox
-from typing import List, Tuple, Optional, cast
+from typing import List, Tuple, Optional, Union, cast
 import re
 import subprocess
 import logging
@@ -15,6 +16,7 @@ if __package__ is None and __name__ == "__main__":
 # Import the application configuration
 from memory_tool import runner
 from memory_tool.config import APPLICATIONS, DEFAULT_LOG_INTERVAL
+from memory_tool.use_cases.protocol import get_locations as _module_get_locations
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -48,6 +50,12 @@ TASK_LAYOUT_BREAKPOINT_1_COL = 520
 
 controls_fields = []
 resize_after_id: Optional[str] = None
+
+# Batch checkbox state. Maps use_case -> either:
+#   - tk.BooleanVar (flat use case)
+#   - dict[location_key, tk.BooleanVar] (variant-aware use case)
+batch_selection: dict = {}
+final_batch_sequence: Optional[list] = None
 
 
 def _compute_form_columns(width: int) -> int:
@@ -199,7 +207,7 @@ def on_task_selected(task: str) -> None:
 def _start_batch(dry_run: bool) -> None:
     """Shared logic for both full and dry batch buttons."""
     global final_task, final_package_name, final_device_code, final_log_interval
-    global final_internal_name, final_start_activity, final_dry_run
+    global final_internal_name, final_start_activity, final_dry_run, final_batch_sequence
 
     if not validate_selection():
         return
@@ -207,6 +215,11 @@ def _start_batch(dry_run: bool) -> None:
     app_config = APPLICATIONS.get(selected_app_name) if selected_app_name else None
     if not app_config or app_config.get("internal_name") != SYGIC_BATCH_INTERNAL_NAME:
         messagebox.showwarning("Unsupported", "Batch sequence is available only for Sygic Profi.")
+        return
+
+    sequence = _selected_batch_sequence()
+    if not sequence:
+        messagebox.showwarning("Empty Batch", "Tick at least one use case (or variant) to run.")
         return
 
     try:
@@ -222,6 +235,7 @@ def _start_batch(dry_run: bool) -> None:
     final_device_code = selected_device_code
     final_log_interval = log_interval
     final_dry_run = dry_run
+    final_batch_sequence = sequence
 
     if selected_app_name is None:
         messagebox.showerror("Error", "No application selected.")
@@ -235,7 +249,7 @@ def _start_batch(dry_run: bool) -> None:
     logger.info(
         "Starting %s: %s on device %s",
         mode,
-        " -> ".join(runner.SYGIC_CORE_BATCH_SEQUENCE),
+        runner.format_sequence(sequence),
         final_device_code,
     )
 
@@ -316,6 +330,107 @@ def on_app_selected(event) -> None:
     logger.info(f"Selected app: {selected_app_name}")
 
 
+def _get_use_case_locations(app_internal_name: str, use_case: str) -> Optional[dict]:
+    """Look up LOCATIONS dict from the use case module, or None if flat."""
+    try:
+        module = importlib.import_module(
+            f"memory_tool.use_cases.{app_internal_name}.{use_case}"
+        )
+    except ImportError:
+        return None
+    return _module_get_locations(module)
+
+
+def _build_batch_options(app_internal_name: Optional[str]) -> None:
+    """Rebuild the batch options checkbox panel for the current app."""
+    for child in batch_options_frame.winfo_children():
+        child.destroy()
+    batch_selection.clear()
+
+    if app_internal_name != SYGIC_BATCH_INTERNAL_NAME:
+        # Empty panel collapses to zero height; nothing more to do.
+        return
+
+    # Walk SYGIC_CORE_BATCH_SEQUENCE to keep order; collect default-selected variants.
+    seen_use_cases: list[str] = []
+    default_locations: dict[str, set[str]] = {}
+    for entry in runner.SYGIC_CORE_BATCH_SEQUENCE:
+        use_case, location = runner.normalize_sequence_entry(entry)
+        if use_case not in seen_use_cases:
+            seen_use_cases.append(use_case)
+        if location is not None:
+            default_locations.setdefault(use_case, set()).add(location)
+
+    row = 0
+    for use_case in seen_use_cases:
+        all_locations = _get_use_case_locations(app_internal_name, use_case)
+        if all_locations:
+            parent_var = tk.BooleanVar(value=True)
+            ttk.Checkbutton(
+                batch_options_frame,
+                text=use_case,
+                variable=parent_var,
+                style="BatchParent.TCheckbutton",
+            ).grid(row=row, column=0, sticky="w", padx=(0, 8), pady=(0, 2))
+            row += 1
+
+            child_vars: dict[str, tk.BooleanVar] = {}
+            defaults = default_locations.get(use_case, set())
+            for loc_key, loc_meta in all_locations.items():
+                child_var = tk.BooleanVar(value=loc_key in defaults)
+                label = loc_meta.get("label", loc_key) if isinstance(loc_meta, dict) else loc_key
+                ttk.Checkbutton(
+                    batch_options_frame,
+                    text=label,
+                    variable=child_var,
+                    style="BatchChild.TCheckbutton",
+                ).grid(row=row, column=0, sticky="w", padx=(24, 8), pady=(0, 2))
+                row += 1
+                child_vars[loc_key] = child_var
+            # The parent checkbox toggles all children together.
+            def make_toggle(parent=parent_var, children=child_vars):
+                def toggle(*_):
+                    state = parent.get()
+                    for v in children.values():
+                        v.set(state)
+                return toggle
+            parent_var.trace_add("write", make_toggle())
+            batch_selection[use_case] = child_vars
+        else:
+            var = tk.BooleanVar(value=True)
+            ttk.Checkbutton(
+                batch_options_frame,
+                text=use_case,
+                variable=var,
+                style="BatchParent.TCheckbutton",
+            ).grid(row=row, column=0, sticky="w", padx=(0, 8), pady=(0, 2))
+            row += 1
+            batch_selection[use_case] = var
+
+
+def _selected_batch_sequence() -> list:
+    """Build the actual batch sequence from current checkbox state."""
+    sequence: list = []
+    seen_use_cases: list[str] = []
+    for entry in runner.SYGIC_CORE_BATCH_SEQUENCE:
+        use_case, _ = runner.normalize_sequence_entry(entry)
+        if use_case not in seen_use_cases:
+            seen_use_cases.append(use_case)
+
+    for use_case in seen_use_cases:
+        sel = batch_selection.get(use_case)
+        if sel is None:
+            continue
+        if isinstance(sel, dict):
+            for loc_key, var in sel.items():
+                if var.get():
+                    sequence.append((use_case, loc_key))
+        elif isinstance(sel, tk.BooleanVar):
+            if sel.get():
+                sequence.append(use_case)
+    return sequence
+
+
 def update_batch_button_state() -> None:
     """Keep batch action visible and clearly communicate availability."""
     app_config = APPLICATIONS.get(selected_app_name) if selected_app_name else None
@@ -351,6 +466,8 @@ def update_task_buttons() -> None:
 
     relayout_task_buttons()
     update_batch_button_state()
+    app_config = APPLICATIONS.get(selected_app_name) if selected_app_name else None
+    _build_batch_options(app_config.get("internal_name") if app_config else None)
 
     schedule_relayout()
 
@@ -385,6 +502,8 @@ style.configure("TCombobox", font=("Segoe UI", 11), padding=7)
 style.configure("Device.TCombobox", font=("Segoe UI Semibold", 11), padding=8)
 style.configure("TSpinbox", font=("Segoe UI", 11), padding=6)
 style.configure("Task.TButton", font=("Segoe UI Semibold", 10), padding=(10, 8))
+style.configure("BatchParent.TCheckbutton", background=palette["card"], foreground=palette["ink"], font=("Segoe UI Semibold", 10))
+style.configure("BatchChild.TCheckbutton", background=palette["card"], foreground=palette["muted"], font=("Segoe UI", 9))
 style.configure("Accent.TButton", font=("Segoe UI Semibold", 11), padding=(14, 10), background=palette["accent"], foreground="#ffffff")
 style.map(
     "Device.TCombobox",
@@ -493,6 +612,11 @@ task_card.pack(pady=(14, 0), fill=tk.BOTH, expand=True)
 
 ttk.Label(task_card, text="Use Cases", style="Section.TLabel").pack(anchor="w", pady=(0, 10))
 
+batch_options_label = ttk.Label(task_card, text="Batch contents:", style="Field.TLabel")
+batch_options_label.pack(anchor="w", pady=(0, 4))
+batch_options_frame = ttk.Frame(task_card, style="Card.TFrame")
+batch_options_frame.pack(fill=tk.X, pady=(0, 10), anchor="w")
+
 actions_frame = ttk.Frame(task_card, style="Card.TFrame")
 actions_frame.pack(fill=tk.X, pady=(0, 10))
 actions_frame.columnconfigure(0, weight=1)
@@ -514,7 +638,7 @@ dry_batch_button.grid(row=1, column=0, sticky="e", padx=(0, 8))
 
 batch_button = ttk.Button(
     actions_frame,
-    text=f"Run Batch: {' -> '.join(runner.SYGIC_CORE_BATCH_SEQUENCE)}",
+    text="Run Batch (selected use cases)",
     command=on_batch_selected,
     style="Accent.TButton",
 )
@@ -572,6 +696,7 @@ if final_task and final_device_code and final_package_name:
                 final_device_code,
                 final_log_interval,
                 start_activity=final_start_activity,
+                use_cases=final_batch_sequence,
                 dry_run=final_dry_run,
             )
             batch_report = result.get("batch_report")

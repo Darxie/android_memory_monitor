@@ -12,8 +12,20 @@
     "description": "Opens com.google.android.calendar via `adb shell monkey`, sleeps for 25 seconds, then brings com.sygic.profi.beta back to the foreground via `adb shell am start ... NaviNativeActivity`.\n\nRepeats 100×."
   },
   "zoom": {
-    "maps": "Nepal",
-    "description": "Searches for 27°55'40.5\"N 86°53'07.5\"E (Mount Everest), taps the result, then opens the zoom controls. Zooms out 20×, then zooms back in 20×.\n\nRepeats the zoom sequence 100×."
+    "name": "Zoom",
+    "description": "Searches for a coordinate, taps the first result, opens the zoom controls and zooms out 20× then back in 20×.\n\nRepeats the zoom sequence 100×.",
+    "variants": {
+      "nepal": {
+        "label": "Nepal (Mt. Everest)",
+        "maps": "Nepal",
+        "description": "Coordinates 27°55'40.5\"N 86°53'07.5\"E (Mount Everest)."
+      },
+      "paris": {
+        "label": "Paris (Tour Eiffel)",
+        "maps": "France",
+        "description": "Eiffel Tower."
+      }
+    }
   },
   "demonstrate": {
     "maps": "Slovakia, Austria, Germany",

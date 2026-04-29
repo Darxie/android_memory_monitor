@@ -9,7 +9,9 @@
         "compute": "data/runs/20260426_141859_sdk28.4.13/compute.csv",
         "search": "data/runs/20260426_141859_sdk28.4.13/search.csv",
         "fg_bg": "data/runs/20260426_141859_sdk28.4.13/fg_bg.csv",
-        "zoom": "data/runs/20260426_141859_sdk28.4.13/zoom.csv",
+        "zoom": {
+          "nepal": "data/runs/20260426_141859_sdk28.4.13/zoom_nepal.csv"
+        },
         "demonstrate": "data/runs/20260426_141859_sdk28.4.13/demonstrate.csv"
       }
     },
@@ -22,7 +24,9 @@
         "compute": "data/runs/20260427_092610_sdk28.4.14/compute.csv",
         "search": "data/runs/20260427_092610_sdk28.4.14/search.csv",
         "fg_bg": "data/runs/20260427_092610_sdk28.4.14/fg_bg.csv",
-        "zoom": "data/runs/20260427_092610_sdk28.4.14/zoom.csv",
+        "zoom": {
+          "nepal": "data/runs/20260427_092610_sdk28.4.14/zoom_nepal.csv"
+        },
         "demonstrate": "data/runs/20260427_092610_sdk28.4.14/demonstrate.csv"
       }
     },
@@ -35,7 +39,9 @@
         "compute": "data/runs/20260428_080241_sdk35.0.0/compute.csv",
         "search": "data/runs/20260428_080241_sdk35.0.0/search.csv",
         "fg_bg": "data/runs/20260428_080241_sdk35.0.0/fg_bg.csv",
-        "zoom": "data/runs/20260428_080241_sdk35.0.0/zoom.csv",
+        "zoom": {
+          "nepal": "data/runs/20260428_080241_sdk35.0.0/zoom_nepal.csv"
+        },
         "demonstrate": "data/runs/20260428_080241_sdk35.0.0/demonstrate.csv"
       }
     },
@@ -49,7 +55,9 @@
         "demonstrate": "data/runs/20250901_090000_sdk25.7.0/demonstrate.csv",
         "fg_bg": "data/runs/20250901_090000_sdk25.7.0/fg_bg.csv",
         "search": "data/runs/20250901_090000_sdk25.7.0/search.csv",
-        "zoom": "data/runs/20250901_090000_sdk25.7.0/zoom.csv"
+        "zoom": {
+          "nepal": "data/runs/20250901_090000_sdk25.7.0/zoom_nepal.csv"
+        }
       }
     },
     {
@@ -62,7 +70,9 @@
         "demonstrate": "data/runs/20251101_090000_sdk25.9.9/demonstrate.csv",
         "fg_bg": "data/runs/20251101_090000_sdk25.9.9/fg_bg.csv",
         "search": "data/runs/20251101_090000_sdk25.9.9/search.csv",
-        "zoom": "data/runs/20251101_090000_sdk25.9.9/zoom.csv"
+        "zoom": {
+          "nepal": "data/runs/20251101_090000_sdk25.9.9/zoom_nepal.csv"
+        }
       }
     },
     {
@@ -75,7 +85,9 @@
         "demonstrate": "data/runs/20251215_090000_sdk28.1.11/demonstrate.csv",
         "fg_bg": "data/runs/20251215_090000_sdk28.1.11/fg_bg.csv",
         "search": "data/runs/20251215_090000_sdk28.1.11/search.csv",
-        "zoom": "data/runs/20251215_090000_sdk28.1.11/zoom.csv"
+        "zoom": {
+          "nepal": "data/runs/20251215_090000_sdk28.1.11/zoom_nepal.csv"
+        }
       }
     },
     {
@@ -88,7 +100,9 @@
         "demonstrate": "data/runs/20260201_090000_sdk28.2.0/demonstrate.csv",
         "fg_bg": "data/runs/20260201_090000_sdk28.2.0/fg_bg.csv",
         "search": "data/runs/20260201_090000_sdk28.2.0/search.csv",
-        "zoom": "data/runs/20260201_090000_sdk28.2.0/zoom.csv"
+        "zoom": {
+          "nepal": "data/runs/20260201_090000_sdk28.2.0/zoom_nepal.csv"
+        }
       }
     },
     {
@@ -101,7 +115,9 @@
         "demonstrate": "data/runs/20260415_090000_sdk28.3.3/demonstrate.csv",
         "fg_bg": "data/runs/20260415_090000_sdk28.3.3/fg_bg.csv",
         "search": "data/runs/20260415_090000_sdk28.3.3/search.csv",
-        "zoom": "data/runs/20260415_090000_sdk28.3.3/zoom.csv"
+        "zoom": {
+          "nepal": "data/runs/20260415_090000_sdk28.3.3/zoom_nepal.csv"
+        }
       }
     }
   ]

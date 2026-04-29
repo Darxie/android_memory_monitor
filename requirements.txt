@@ -3,3 +3,4 @@ uiautomator2
 matplotlib
 seaborn
 pandas
+pytest

@@ -86,7 +86,8 @@ output/<timestamp>_batch/
     app_info.txt
   search/
   fg_bg/
-  zoom/
+  zoom_nepal/                # variant-aware: <use_case>_<variant>/
+  zoom_paris/
   demonstrate/
   batch_report.html         # aggregated batch report inside the folder
 ```
@@ -140,13 +141,55 @@ per use case with one line per SDK:
 
 ### Use case protocol
 
-Every use case module exposes `def run_test(device, memory_tool): ...`. Runner
-calls `validate(module)` after `importlib.import_module`; missing `run_test`
-raises `ImportError` immediately, not at execution time.
+Every use case module exposes `def run_test(device, memory_tool, location=None): ...`.
+Runner calls `validate(module)` after `importlib.import_module`; missing `run_test`
+raises `ImportError` immediately, not at execution time. The `location` keyword
+is only used by variant-aware modules (see below).
 
 Module-level "NECESSARY MAPS" strings in use case files are documentation. The
 canonical per-use-case maps live in `dashboard/data/use_cases.json` (which the
-dashboard reads to render the "Required Maps" overview at the top).
+dashboard reads to render the "Required Maps" overview at the top). For
+variant-aware use cases, maps live under `variants.<key>.maps`.
+
+### Variant-aware use cases
+
+Some use cases run the same scenario across multiple presets (e.g. `zoom` runs
+in Nepal *and* Paris). They expose a `LOCATIONS` dict at module level:
+
+```python
+# zoom.py
+LOCATIONS = {
+    "nepal": {"label": "Nepal (Mt. Everest)", "search_query": "...", "maps": "Nepal"},
+    "paris": {"label": "Paris (Tour Eiffel)", "search_query": "...", "maps": "France"},
+}
+DEFAULT_LOCATION = "nepal"
+
+def run_test(device, memory_tool, location=None): ...
+```
+
+`memory_tool.use_cases.protocol.get_locations(module)` returns the dict (or
+`None` for flat use cases) — the GUI uses it to render variant checkboxes.
+
+Each `(use_case, variant)` is **one sequential run** with its own output dir
+(`output/<batch>/<use_case>_<variant>/`) and its own CSV. The runner expects
+`SYGIC_CORE_BATCH_SEQUENCE` entries to be either a string (`"compute"`) or a
+`(name, variant)` tuple (`("zoom", "nepal")`); `runner.normalize_sequence_entry`
+converts either form to a `(use_case, location)` pair, and
+`runner.format_sequence` produces a `compute -> zoom/nepal -> ...` display
+string.
+
+`archive.py` writes nested manifest entries for variant-aware use cases:
+
+```json
+{"compute": "data/runs/X/compute.csv",
+ "zoom":    {"nepal": "data/runs/X/zoom_nepal.csv",
+             "paris": "data/runs/X/zoom_paris.csv"}}
+```
+
+The dashboard frontend (`assets/app.js`) detects nested values and renders a
+"Location:" selector inside that use case's chart card. `dashboard/data/use_cases.json`
+mirrors the structure with display metadata under `<use_case>.variants.<key>`
+(`label`, `maps`, `description`).
 
 ### ExecutionTimestamp
 
