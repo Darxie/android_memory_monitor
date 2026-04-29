@@ -9,9 +9,8 @@ the device is constantly off-route — exercises the recompute memory paths.
 Requirements:
     1. Mock Locations app (ru.gavrikov.mocklocations) installed.
     2. Developer Options → Select mock location app → Mock Locations.
-    3. A saved route preset in Mock Locations covering France/Spain → Slovakia
-       (or whatever opposite of ROUTE_DEST_QUERY makes sense). Set its name in
-       SAVED_ROUTE_NAME below.
+    3. A saved route preset in Mock Locations covering 
+        City Stade Brun, Bordeaux, France → Vlak bus shopping, Banska Bystrica, Slovakia
     4. Sygic must already have necessary maps downloaded (see use_cases.json).
 
 The Mock Locations selectors below are best-guess. The first time you run this,
@@ -38,7 +37,7 @@ SYGIC_ACTIVITY = "com.sygic.profi.platform.splashscreen.feature.ui.main.SplashSc
 
 # Mock Locations
 MOCK_LOCATIONS_PACKAGE = "ru.gavrikov.mocklocations"
-SAVED_ROUTE_NAME = "fra-sk"  # Name of the saved route preset to load
+SAVED_ROUTE_NAME = "bordeaux-banska"  # Name of the saved route preset to load
 
 # --- Mock Locations UI selectors ---
 # Validate after first run via the _debug_*.xml dumps in output/.
@@ -46,7 +45,8 @@ SAVED_ROUTES_BUTTON_CANDIDATES = [
     {"resourceId": "ru.gavrikov.mocklocations:id/button_save"}
 ]
 RUN_BUTTON_CANDIDATES = [
-    {"resourceId": "ru.gavrikov.mocklocations:id/runButton"}
+    {"resourceId": "ru.gavrikov.mocklocations:id/runButton"},
+    {"text": "Run!"},
 ]
 STOP_BUTTON_CANDIDATES = [
     {"resourceId": "ru.gavrikov.mocklocations:id/stop_button"},
