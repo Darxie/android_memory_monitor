@@ -23,8 +23,12 @@ logger = logging.getLogger(__name__)
 
 # UI Constants
 MIN_WINDOW_WIDTH = 1100
-MIN_WINDOW_HEIGHT = 600
+MIN_WINDOW_HEIGHT = 760
 BUTTON_COLUMNS = 4
+FORM_GRID_MAX_COLUMNS = 4
+BATCH_LAYOUT_BREAKPOINT_3_COL = 1080
+BATCH_LAYOUT_BREAKPOINT_2_COL = 760
+BATCH_OPTIONS_MAX_COLUMNS = 3
 
 # Global Variables
 selected_device_code: Optional[str] = None
@@ -50,6 +54,7 @@ TASK_LAYOUT_BREAKPOINT_1_COL = 520
 
 controls_fields = []
 resize_after_id: Optional[str] = None
+batch_option_rows: list[ttk.Frame] = []
 
 # Batch checkbox state. Maps use_case -> either:
 #   - tk.BooleanVar (flat use case)
@@ -64,6 +69,14 @@ def _compute_form_columns(width: int) -> int:
     if width < FORM_LAYOUT_BREAKPOINT_MEDIUM:
         return 2
     return 4
+
+
+def _compute_batch_columns(width: int) -> int:
+    if width < BATCH_LAYOUT_BREAKPOINT_2_COL:
+        return 1
+    if width < BATCH_LAYOUT_BREAKPOINT_3_COL:
+        return 2
+    return BATCH_OPTIONS_MAX_COLUMNS
 
 
 def _compute_task_columns(width: int) -> int:
@@ -87,7 +100,7 @@ def relayout_controls_grid() -> None:
     for child in controls_grid.winfo_children():
         cast(tk.Widget, child).grid_forget()
 
-    for col in range(BUTTON_COLUMNS):
+    for col in range(FORM_GRID_MAX_COLUMNS):
         controls_grid.columnconfigure(col, weight=0, uniform="")
     for col in range(columns):
         controls_grid.columnconfigure(col, weight=1, uniform="form")
@@ -127,6 +140,29 @@ def relayout_task_buttons() -> None:
         )
 
 
+def relayout_batch_options() -> None:
+    """Reflow batch option rows so checkboxes stay readable without growing too tall."""
+    if not batch_option_rows:
+        return
+
+    width = batch_options_frame.winfo_width() or task_card.winfo_width() or root.winfo_width()
+    columns = _compute_batch_columns(width)
+
+    for col in range(BATCH_OPTIONS_MAX_COLUMNS):
+        batch_options_frame.columnconfigure(col, weight=0, uniform="")
+    for col in range(columns):
+        batch_options_frame.columnconfigure(col, weight=1, uniform="batch")
+
+    for idx, row_frame in enumerate(batch_option_rows):
+        row_frame.grid(
+            row=idx // columns,
+            column=idx % columns,
+            padx=(0, 12),
+            pady=(0, 6),
+            sticky="w",
+        )
+
+
 def schedule_relayout() -> None:
     """Debounce layout updates while user resizes the window."""
     global resize_after_id
@@ -141,6 +177,7 @@ def perform_relayout() -> None:
     global resize_after_id
     resize_after_id = None
     relayout_controls_grid()
+    relayout_batch_options()
     relayout_task_buttons()
 
 
@@ -343,6 +380,7 @@ def _get_use_case_locations(app_internal_name: str, use_case: str) -> Optional[d
 
 def _build_batch_options(app_internal_name: Optional[str]) -> None:
     """Rebuild the batch options checkbox panel for the current app."""
+    batch_option_rows.clear()
     for child in batch_options_frame.winfo_children():
         child.destroy()
     batch_selection.clear()
@@ -361,18 +399,17 @@ def _build_batch_options(app_internal_name: Optional[str]) -> None:
         if location is not None:
             default_locations.setdefault(use_case, set()).add(location)
 
-    row = 0
     for use_case in seen_use_cases:
+        option_row = ttk.Frame(batch_options_frame, style="Card.TFrame")
         all_locations = _get_use_case_locations(app_internal_name, use_case)
         if all_locations:
             parent_var = tk.BooleanVar(value=True)
             ttk.Checkbutton(
-                batch_options_frame,
+                option_row,
                 text=use_case,
                 variable=parent_var,
                 style="BatchParent.TCheckbutton",
-            ).grid(row=row, column=0, sticky="w", padx=(0, 8), pady=(0, 2))
-            row += 1
+            ).pack(side=tk.LEFT, padx=(0, 10))
 
             child_vars: dict[str, tk.BooleanVar] = {}
             defaults = default_locations.get(use_case, set())
@@ -380,32 +417,35 @@ def _build_batch_options(app_internal_name: Optional[str]) -> None:
                 child_var = tk.BooleanVar(value=loc_key in defaults)
                 label = loc_meta.get("label", loc_key) if isinstance(loc_meta, dict) else loc_key
                 ttk.Checkbutton(
-                    batch_options_frame,
+                    option_row,
                     text=label,
                     variable=child_var,
                     style="BatchChild.TCheckbutton",
-                ).grid(row=row, column=0, sticky="w", padx=(24, 8), pady=(0, 2))
-                row += 1
+                ).pack(side=tk.LEFT, padx=(0, 10))
                 child_vars[loc_key] = child_var
             # The parent checkbox toggles all children together.
-            def make_toggle(parent=parent_var, children=child_vars):
-                def toggle(*_):
-                    state = parent.get()
-                    for v in children.values():
-                        v.set(state)
-                return toggle
-            parent_var.trace_add("write", make_toggle())
+            tracked_children = tuple(child_vars.values())
+
+            def toggle_children(*_args, parent=parent_var, children=tracked_children):
+                state = parent.get()
+                for var in children:
+                    var.set(state)
+
+            parent_var.trace_add("write", toggle_children)
             batch_selection[use_case] = child_vars
         else:
             var = tk.BooleanVar(value=True)
             ttk.Checkbutton(
-                batch_options_frame,
+                option_row,
                 text=use_case,
                 variable=var,
                 style="BatchParent.TCheckbutton",
-            ).grid(row=row, column=0, sticky="w", padx=(0, 8), pady=(0, 2))
-            row += 1
+            ).pack(side=tk.LEFT, padx=(0, 10))
             batch_selection[use_case] = var
+
+        batch_option_rows.append(option_row)
+
+    relayout_batch_options()
 
 
 def _selected_batch_sequence() -> list:

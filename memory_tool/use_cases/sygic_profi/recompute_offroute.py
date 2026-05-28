@@ -21,7 +21,6 @@ Necessary maps: France, Germany, Slovakia, Austria, Switzerland, Czechia
 """
 import time
 import logging
-from pathlib import Path
 from . import shared
 
 # Test duration
@@ -95,10 +94,10 @@ def _start_mock_location(device, memory_tool):
     time.sleep(1)
 
     memory_tool.adb.shell("monkey", "-p", MOCK_LOCATIONS_PACKAGE, "1")
-    time.sleep(3)
+    time.sleep(15)
 
     if not _try_click(device, SAVED_ROUTES_BUTTON_CANDIDATES):
-        _dump_hierarchy(device, "mock_loc_no_saved_routes_btn")
+        shared.dump_hierarchy(device, "mock_loc_no_saved_routes_btn")
         raise RuntimeError(
             "Mock Locations: saved-routes button not found. "
             "Inspect output/_debug_mock_loc_no_saved_routes_btn.xml and update "
@@ -107,7 +106,7 @@ def _start_mock_location(device, memory_tool):
     time.sleep(2)
 
     if not _try_click(device, [{"text": SAVED_ROUTE_NAME}]):
-        _dump_hierarchy(device, "mock_loc_no_saved_route")
+        shared.dump_hierarchy(device, "mock_loc_no_saved_route")
         raise RuntimeError(
             f"Mock Locations: saved route '{SAVED_ROUTE_NAME}' not found. "
             "Inspect output/_debug_mock_loc_no_saved_route.xml and check "
@@ -116,7 +115,7 @@ def _start_mock_location(device, memory_tool):
     time.sleep(2)
 
     if not _try_click(device, RUN_BUTTON_CANDIDATES):
-        _dump_hierarchy(device, "mock_loc_no_run_btn")
+        shared.dump_hierarchy(device, "mock_loc_no_run_btn")
         raise RuntimeError(
             "Mock Locations: Run button not found. "
             "Inspect output/_debug_mock_loc_no_run_btn.xml and update "
@@ -132,7 +131,7 @@ def _stop_mock_location(device, memory_tool):
     time.sleep(2)
 
     if not _try_click(device, STOP_BUTTON_CANDIDATES):
-        _dump_hierarchy(device, "mock_loc_no_stop_btn")
+        shared.dump_hierarchy(device, "mock_loc_no_stop_btn")
         logging.warning(
             "Mock Locations: Stop button not found, simulation may keep running. "
             "Inspect output/_debug_mock_loc_no_stop_btn.xml."
@@ -182,15 +181,3 @@ def _try_click(device, candidates: list[dict]) -> bool:
             logging.debug("clicked Mock Locations selector %s", sel)
             return True
     return False
-
-
-def _dump_hierarchy(device, name: str) -> None:
-    """Save current UI hierarchy to a debug file so we can iterate selectors offline."""
-    try:
-        xml = device.dump_hierarchy(compressed=False)
-        out = Path(f"output/_debug_{name}.xml")
-        out.parent.mkdir(parents=True, exist_ok=True)
-        out.write_text(xml, encoding="utf-8")
-        logging.warning("Dumped UI hierarchy to %s", out)
-    except Exception as e:
-        logging.warning("Failed to dump hierarchy: %s", e)
