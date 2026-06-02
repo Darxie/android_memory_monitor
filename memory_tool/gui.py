@@ -1,5 +1,6 @@
 from pathlib import Path
 import importlib
+import shutil
 import sys
 import tkinter as tk
 from tkinter import ttk, messagebox
@@ -43,6 +44,7 @@ final_log_interval: int = DEFAULT_LOG_INTERVAL
 final_internal_name: Optional[str] = None
 final_start_activity: Optional[str] = None
 final_dry_run: bool = False
+final_discard_output: bool = False
 
 BATCH_TASK_ID = "__sygic_core_batch__"
 SYGIC_BATCH_INTERNAL_NAME = "sygic_profi"
@@ -207,7 +209,7 @@ def validate_selection() -> bool:
 def on_task_selected(task: str) -> None:
     """Handle task button selection."""
     global final_task, final_package_name, final_device_code, final_log_interval
-    global final_internal_name, final_start_activity
+    global final_internal_name, final_start_activity, final_discard_output
 
     if not validate_selection():
         return
@@ -225,6 +227,7 @@ def on_task_selected(task: str) -> None:
     final_package_name = get_package_name()
     final_device_code = selected_device_code
     final_log_interval = log_interval
+    final_discard_output = discard_output_var.get()
 
     if selected_app_name is None:
         messagebox.showerror("Error", "No application selected.")
@@ -245,6 +248,7 @@ def _start_batch(dry_run: bool) -> None:
     """Shared logic for both full and dry batch buttons."""
     global final_task, final_package_name, final_device_code, final_log_interval
     global final_internal_name, final_start_activity, final_dry_run, final_batch_sequence
+    global final_discard_output
 
     if not validate_selection():
         return
@@ -273,6 +277,7 @@ def _start_batch(dry_run: bool) -> None:
     final_log_interval = log_interval
     final_dry_run = dry_run
     final_batch_sequence = sequence
+    final_discard_output = discard_output_var.get()
 
     if selected_app_name is None:
         messagebox.showerror("Error", "No application selected.")
@@ -545,6 +550,7 @@ style.configure("Task.TButton", font=("Segoe UI Semibold", 10), padding=(10, 8))
 style.configure("BatchParent.TCheckbutton", background=palette["card"], foreground=palette["ink"], font=("Segoe UI Semibold", 10))
 style.configure("BatchChild.TCheckbutton", background=palette["card"], foreground=palette["muted"], font=("Segoe UI", 9))
 style.configure("Accent.TButton", font=("Segoe UI Semibold", 11), padding=(14, 10), background=palette["accent"], foreground="#ffffff")
+style.configure("DevMode.TCheckbutton", background=palette["card"], foreground="#b45309", font=("Segoe UI", 10))
 style.map(
     "Device.TCombobox",
     fieldbackground=[("readonly", "#f9fbfd")],
@@ -668,13 +674,21 @@ actions_hint = ttk.Label(
 )
 actions_hint.grid(row=0, column=0, columnspan=2, sticky="w", padx=(0, 10), pady=(0, 8))
 
+discard_output_var = tk.BooleanVar(value=False)
+ttk.Checkbutton(
+    actions_frame,
+    text="Discard output after run  (dev mode — keeps output/ clean)",
+    variable=discard_output_var,
+    style="DevMode.TCheckbutton",
+).grid(row=1, column=0, columnspan=2, sticky="w", pady=(0, 8))
+
 dry_batch_button = ttk.Button(
     actions_frame,
     text="Run Dry Batch (shortened, ~10-20 min)",
     command=on_dry_batch_selected,
     style="Accent.TButton",
 )
-dry_batch_button.grid(row=1, column=0, sticky="e", padx=(0, 8))
+dry_batch_button.grid(row=2, column=0, sticky="e", padx=(0, 8))
 
 batch_button = ttk.Button(
     actions_frame,
@@ -682,7 +696,7 @@ batch_button = ttk.Button(
     command=on_batch_selected,
     style="Accent.TButton",
 )
-batch_button.grid(row=1, column=1, sticky="e")
+batch_button.grid(row=2, column=1, sticky="e")
 
 task_buttons_frame = ttk.Frame(task_card, style="Card.TFrame")
 task_buttons_frame.pack(fill=tk.BOTH, expand=True)
@@ -739,12 +753,18 @@ if final_task and final_device_code and final_package_name:
                 use_cases=final_batch_sequence,
                 dry_run=final_dry_run,
             )
-            batch_report = result.get("batch_report")
-            if batch_report:
-                title = "Dry Batch Finished" if final_dry_run else "Batch Finished"
-                messagebox.showinfo(title, f"Batch report saved to:\n{batch_report}")
+            if final_discard_output:
+                batch_dir = result.get("batch_dir")
+                if batch_dir and Path(batch_dir).exists():
+                    shutil.rmtree(batch_dir)
+                    logger.info("Discarded batch output: %s", batch_dir)
+            else:
+                batch_report = result.get("batch_report")
+                if batch_report:
+                    title = "Dry Batch Finished" if final_dry_run else "Batch Finished"
+                    messagebox.showinfo(title, f"Batch report saved to:\n{batch_report}")
         else:
-            runner.run_automation_tasks(
+            artifacts = runner.run_automation_tasks(
                 final_internal_name,
                 final_package_name,
                 final_task,
@@ -752,6 +772,11 @@ if final_task and final_device_code and final_package_name:
                 final_log_interval,
                 start_activity=final_start_activity,
             )
+            if final_discard_output and artifacts:
+                out_dir = artifacts.get("output_dir")
+                if out_dir and Path(out_dir).exists():
+                    shutil.rmtree(Path(out_dir))
+                    logger.info("Discarded run output: %s", out_dir)
     except Exception as e:
         logger.error(f"Test execution failed: {e}", exc_info=True)
         messagebox.showerror("Test Failed", f"Test execution failed: {e}")

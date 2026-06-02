@@ -35,7 +35,7 @@ APPLICATIONS = {
             "debug": "com.roadlords.android",
         },
         "start_activity": "com.sygic.profi.platform.splashscreen.feature.ui.main.SplashScreenActivity",
-        "use_cases": ["ew_compute", "ew_search"],
+        "use_cases": ["ew_compute", "ew_search", "ew_zoom"],
     },
 }
 
