@@ -12,8 +12,8 @@ APPLICATIONS = {
     "Sygic Profi": {
         "internal_name": "sygic_profi",
         "package_name": {
-            "release": "com.sygic.profi.beta",
-            "debug": "com.sygic.profi.beta.debug",
+            "release": "com.sygic.profi.volvo",
+            "debug": "com.sygic.profi.volvo.debug",
         },
         "start_activity": "com.sygic.profi.platform.splashscreen.feature.ui.main.SplashScreenActivity",
         "use_cases": [

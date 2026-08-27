@@ -4,7 +4,7 @@ from pathlib import Path
 
 
 SEARCH_BAR_ID = "SearchBar.Input"
-SEARCH_FIELD_ID = "com.sygic.profi.beta:id/inputField"
+SEARCH_FIELD_ID = None  # new app has no resource-id on the search EditText
 MENU_ICON_ID = "SearchBar.MenuIcon"
 PROFILE_ICON_ID = "SearchBar.ProfileIcon"
 
@@ -141,6 +141,12 @@ def wait_for_map_ready(device, timeout: int = 30) -> bool:
     except Exception as e:
         logging.debug("Route cancel during recovery failed: %s", e)
 
+    agree = device(resourceId="agree_button")
+    if agree.exists(timeout=5):
+        logging.info("Dismissing agree_button during map-ready recovery")
+        agree.click()
+        time.sleep(2)
+
     for _ in range(3):
         if (
             device(resourceId=SEARCH_BAR_ID).exists(timeout=2)
@@ -148,6 +154,10 @@ def wait_for_map_ready(device, timeout: int = 30) -> bool:
             or device(resourceId=PROFILE_ICON_ID).exists(timeout=1)
         ):
             return True
+        if device(resourceId="agree_button").exists(timeout=1):
+            device(resourceId="agree_button").click()
+            time.sleep(2)
+            continue
         try:
             device.press("back")
         except Exception as e:
@@ -173,11 +183,6 @@ def tap_search_bar(device):
         RuntimeError: if the search bar never appears (hierarchy is dumped to
             output/_debug_sygic_map_not_ready.xml for inspection).
     """
-    search_field = device(resourceId=SEARCH_FIELD_ID)
-    if search_field.exists(timeout=2):
-        search_field.click()
-        return
-
     if not wait_for_map_ready(device):
         raise RuntimeError(
             "Sygic main map screen not ready: SearchBar.Input never appeared. "
@@ -190,9 +195,6 @@ def tap_search_bar(device):
         return
 
     if _tap_search_bar_fallback(device):
-        if search_field.exists(timeout=5):
-            search_field.click()
-            return
         if search_bar.exists(timeout=2):
             search_bar.click()
             return
@@ -212,7 +214,7 @@ def set_search_text(device, input_text):
         device: The device object.
         input_text (str): The text to enter.
     """
-    device(resourceId="com.sygic.profi.beta:id/inputField").set_text(input_text)
+    device(className="android.widget.EditText").set_text(input_text)
 
 def select_first_result(device):
     """
@@ -221,7 +223,108 @@ def select_first_result(device):
     Args:
         device: The device object.
     """
-    device(resourceId="com.sygic.profi.beta:id/recyclerView").child(index=0).click()
+    candidates = [
+        "FullTextSearch.Result.0",
+        "FullTextSearch.Item.0",
+        "SearchResult.0",
+    ]
+    for res_id in candidates:
+        el = device(resourceId=res_id)
+        if el.exists(timeout=1):
+            el.click()
+            return
+
+    if _select_first_result_fallback(device):
+        return
+
+    dump_hierarchy(device, "select_first_result_failed")
+    raise RuntimeError("Could not find first search result. Inspect output/_debug_select_first_result_failed.xml.")
+
+
+def _search_bar_bottom(device) -> int:
+    """
+    Return the Y coordinate of the bottom of the search input row, used as a
+    vertical anchor to distinguish result rows from the search bar chrome.
+
+    Prefers the FullTextSearch.Clear / FullTextSearch.Back chrome (which still
+    carry resource-ids in the Compose builds); falls back to ~14% of screen
+    height.
+    """
+    for anchor_id in ("FullTextSearch.Clear", "FullTextSearch.Back"):
+        anchor = device(resourceId=anchor_id)
+        if anchor.exists(timeout=1):
+            try:
+                bottom = anchor.info.get("visibleBounds", {}).get("bottom")
+                if bottom is None:
+                    bottom = anchor.info.get("bounds", {}).get("bottom")
+                if bottom is not None:
+                    return int(bottom)
+            except Exception as e:
+                logging.debug("Failed to read %s bounds: %s", anchor_id, e)
+
+    height = device.info.get("displayHeight", 2400)
+    return int(height * 0.14)
+
+
+def _select_first_result_fallback(device) -> bool:
+    """
+    Click the first search result in the Compose-based search list.
+
+    Newer app builds (e.g. Volvo ICM, SDK 40.x) render the results list in
+    Jetpack Compose, so individual rows no longer expose
+    FullTextSearch.Result.0 / SearchResult.0 resource-ids. Each row is a plain
+    clickable android.view.View with an empty resource-id, positioned below the
+    search bar. This picks the topmost such row.
+
+    Returns True if a result row was found and clicked.
+    """
+    anchor_y = _search_bar_bottom(device)
+
+    rows = device(className="android.view.View", clickable=True)
+    try:
+        count = rows.count
+    except Exception as e:
+        logging.debug("Failed to count clickable views: %s", e)
+        return False
+
+    best = None
+    for i in range(count):
+        try:
+            info = rows[i].info
+        except Exception as e:
+            logging.debug("Failed to read clickable view %d: %s", i, e)
+            continue
+
+        # Skip chrome that carries a resource-id (e.g. FullTextSearch.Back/Clear).
+        if info.get("resourceName"):
+            continue
+
+        bounds = info.get("visibleBounds") or info.get("bounds") or {}
+        top = bounds.get("top")
+        bottom = bounds.get("bottom")
+        if top is None or bottom is None:
+            continue
+
+        # Result rows sit below the search bar; ignore anything overlapping it.
+        if top < anchor_y:
+            continue
+
+        height = bottom - top
+        if height <= 0:
+            continue
+
+        if best is None or top < best[0]:
+            best = (top, bounds)
+
+    if best is None:
+        return False
+
+    _, bounds = best
+    x = (bounds["left"] + bounds["right"]) // 2
+    y = (bounds["top"] + bounds["bottom"]) // 2
+    logging.info("Selecting first search result via Compose fallback at (%s, %s)", x, y)
+    device.click(x, y)
+    return True
 
 def tap_x_button(device):
     """

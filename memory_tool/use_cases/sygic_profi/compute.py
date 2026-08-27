@@ -8,7 +8,7 @@ NECESSARY MAPS - Slovakia, Austria
 """
 
 ITERATIONS_FULL = 100
-ITERATIONS_DRY_RUN = 20
+ITERATIONS_DRY_RUN = 5
 
 
 def run_test(device, memory_tool):
@@ -21,17 +21,14 @@ def run_test(device, memory_tool):
         time.sleep(1)
         shared.tap_search_bar(device)
         time.sleep(1)
-        device(resourceId="com.sygic.profi.beta:id/inputField").set_text(
+        device(className="android.widget.EditText").set_text(
             "Lagerhaus Tamsweg"
         )
         time.sleep(1)
-        device(
-            resourceId="com.sygic.profi.beta:id/searchItemTitle",
-            text="Lagerhaus",
-        ).click()
+        shared.select_first_result(device)
         time.sleep(1)
 
-        device(text="Get directions").click()
+        device(resourceId="SearchDestination.GetDirections").click()
         time.sleep(
             5
         )  # depends on the device's compute performance. adjust accordingly

@@ -19,7 +19,7 @@ def run_test(device, memory_tool):
         time.sleep(sleep_seconds)
         memory_tool.adb.shell(
             "am", "start", "-n",
-            "com.sygic.profi.beta/com.sygic.profi.platform.splashscreen.feature.ui.main.SplashScreenActivity",
+            "com.sygic.profi.volvo/com.sygic.profi.platform.splashscreen.feature.ui.main.SplashScreenActivity",
         )
         logging.info("switched to profi navi")
     memory_tool.stop_monitoring()

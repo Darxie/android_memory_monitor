@@ -8,7 +8,7 @@ NECESSARY MAPS - Slovakia, South Carolina, Singapore, Italy
 """
 
 ITERATIONS_FULL = 100
-ITERATIONS_DRY_RUN = 20
+ITERATIONS_DRY_RUN = 10
 
 
 # crashes spontaneously

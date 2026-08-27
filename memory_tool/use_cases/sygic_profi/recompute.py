@@ -25,14 +25,14 @@ def run_test(device, memory_tool):
     device(focused=True).set_text("Horné obdokovce")
     time.sleep(4)
     device.xpath(
-        '//*[@resource-id="com.sygic.profi.beta:id/recyclerView"]/android.view.ViewGroup[1]/android.widget.TextView[1]'
+        '//*[@resource-id="com.sygic.profi.volvo:id/recyclerView"]/android.view.ViewGroup[1]/android.widget.TextView[1]'
     ).click()
     time.sleep(1)
 
     device(text="Get directions").click()
     time.sleep(15)  # depends on the device's compute performance. adjust accordingly
     device.xpath(
-        '//*[@resource-id="com.sygic.profi.beta:id/routePlannerDetailBottomSheetContent"]/android.view.View[1]/android.view.View[3]'
+        '//*[@resource-id="com.sygic.profi.volvo:id/routePlannerDetailBottomSheetContent"]/android.view.View[1]/android.view.View[3]'
     ).click()
 
 

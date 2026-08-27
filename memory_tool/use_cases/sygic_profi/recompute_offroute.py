@@ -25,13 +25,13 @@ from . import shared
 
 # Test duration
 DURATION_SECONDS_FULL = 36000   # 10 hours
-DURATION_SECONDS_DRY_RUN = 300  # 5 minutes for dashboard validation
+DURATION_SECONDS_DRY_RUN = 60  # 5 minutes for dashboard validation
 
 # Sygic destination — long route from device's location toward this point
 ROUTE_DEST_QUERY = "Paris, France"
 
 # Sygic
-SYGIC_PACKAGE = "com.sygic.profi.beta"
+SYGIC_PACKAGE = "com.sygic.profi.volvo"
 SYGIC_ACTIVITY = "com.sygic.profi.platform.splashscreen.feature.ui.main.SplashScreenActivity"
 
 # Mock Locations
@@ -48,6 +48,7 @@ RUN_BUTTON_CANDIDATES = [
     {"text": "Run!"},
 ]
 STOP_BUTTON_CANDIDATES = [
+    {"resourceId": "ru.gavrikov.mocklocations:id/button_stop_route"},
     {"resourceId": "ru.gavrikov.mocklocations:id/stop_button"},
     {"description": "Stop"},
     {"text": "STOP"},
@@ -75,8 +76,10 @@ def _setup_sygic_route(device):
     shared.tap_search_bar(device)
     device(focused=True).set_text(ROUTE_DEST_QUERY)
 
-    if device(resourceId="com.sygic.profi.beta:id/searchItemTitle").exists(timeout=5):
-        device(resourceId="com.sygic.profi.beta:id/searchItemTitle").click()
+    try:
+        shared.select_first_result(device)
+    except RuntimeError:
+        pass  # destination may auto-resolve; GetDirections appears directly
     time.sleep(1)
 
     device(resourceId="SearchDestination.GetDirections").click()

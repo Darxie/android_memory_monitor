@@ -90,6 +90,9 @@ def _is_uiautomator_already_registered_error(error: Exception) -> bool:
     return (
         "AccessibilityServiceAlreadyRegisteredError" in message
         or "UiAutomationService" in message and "already registered" in message
+        or "server quit unexpectly" in message
+        or "forcibly closed by the remote host" in message
+        or "10054" in message
     )
 
 
@@ -225,7 +228,10 @@ def initialize_device(package_name, device_code, start_activity=None):
         try:
             device = u2.connect(device_code)
             device.app_stop(package_name)  # force close app if running
-            logging.info(f"Connected to device: {device_code}\n{device.info}")
+            try:
+                logging.info(f"Connected to device: {device_code}\n{device.info}")
+            except Exception:
+                logging.info(f"Connected to device: {device_code} (device.info unavailable)")
             device.screen_on()
 
             if start_activity:
@@ -235,6 +241,11 @@ def initialize_device(package_name, device_code, start_activity=None):
             else:
                 logging.info(f"Starting package: {package_name}")
                 device.app_start(package_name)
+
+            agree_button = device(resourceId="agree_button")
+            if agree_button.exists(timeout=30):
+                logging.info("Dismissing startup agreement dialog")
+                agree_button.click()
 
             adb.logcat_clear()
             return device
@@ -377,17 +388,25 @@ def run_automation_batch(app_name_internal, package_name, device_code, log_inter
         sub_dir_name = use_case if location is None else f"{use_case}_{location}"
         logging.info(f"Starting batch use-case: {format_sequence_entry(entry)}")
         ExecutionTimestamp.reset()
-        artifacts = run_automation_tasks(
-            app_name_internal,
-            package_name,
-            use_case,
-            device_code,
-            log_interval,
-            start_activity=start_activity,
-            dry_run=dry_run,
-            output_dir=batch_dir / sub_dir_name,
-            location=location,
-        )
+        try:
+            artifacts = run_automation_tasks(
+                app_name_internal,
+                package_name,
+                use_case,
+                device_code,
+                log_interval,
+                start_activity=start_activity,
+                dry_run=dry_run,
+                output_dir=batch_dir / sub_dir_name,
+                location=location,
+            )
+        except Exception as e:
+            logging.error(f"Batch use-case {format_sequence_entry(entry)} failed, continuing: {e}")
+            if "10061" in str(e) or "10054" in str(e):
+                logging.warning("ADB connection lost — restarting adb server before next use case")
+                execute_adb_command(["adb", "kill-server"], timeout=10)
+                execute_adb_command(["adb", "start-server"], timeout=30)
+            artifacts = {"use_case": use_case, "location": location, "error": str(e)}
         run_artifacts.append(artifacts)
 
     batch_report = generate_batch_report(run_artifacts, app_name_internal, output_dir=batch_dir)

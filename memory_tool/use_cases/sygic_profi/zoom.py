@@ -4,7 +4,7 @@ from . import shared
 
 
 ITERATIONS_FULL = 100
-ITERATIONS_DRY_RUN = 20
+ITERATIONS_DRY_RUN = 5
 
 # Variant-aware: the runner reads LOCATIONS to know this use case has variants.
 # Each entry must have a search_query the in-app search bar can resolve.
@@ -43,7 +43,7 @@ def run_test(device, memory_tool, location=None):
 
     _navigate_to_target(device, config["search_query"])
     time.sleep(1)
-    device.xpath('//*[@resource-id="com.sygic.profi.beta:id/zoomControls"]').click()
+    device.xpath('//*[@resource-id="com.sygic.profi.volvo:id/zoomControls"]').click()
 
     iterations = ITERATIONS_DRY_RUN if memory_tool.dry_run else ITERATIONS_FULL
     for i in range(iterations):

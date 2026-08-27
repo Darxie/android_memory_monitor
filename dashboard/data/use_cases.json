@@ -9,7 +9,7 @@
   },
   "fg_bg": {
     "name": "Foreground to Background",
-    "description": "Opens com.google.android.calendar via `adb shell monkey`, sleeps for 25 seconds, then brings com.sygic.profi.beta back to the foreground via `adb shell am start ... NaviNativeActivity`.\n\nRepeats 100×."
+    "description": "Opens com.google.android.calendar via `adb shell monkey`, sleeps for 25 seconds, then brings com.sygic.profi.volvo back to the foreground via `adb shell am start ... NaviNativeActivity`.\n\nRepeats 100×."
   },
   "zoom": {
     "name": "Zoom",
