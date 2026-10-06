@@ -2,9 +2,8 @@ import time
 import logging
 from . import demonstrate
 
-"""
-NECESSARY MAPS - Germany
-"""
+# Same route as demonstrate (current position -> Duesseldorf).
+REQUIRED_MAPS = ["sk", "at", "de"]
 
 PACKAGE = "com.sygic.profi.volvo"
 START_ACTIVITY = "com.sygic.profi.platform.splashscreen.feature.ui.main.SplashScreenActivity"

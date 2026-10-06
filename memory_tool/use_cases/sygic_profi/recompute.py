@@ -2,9 +2,8 @@ import time
 import threading
 from . import shared
 
-"""
-NECESSARY MAPS - Slovakia, Austria, Italy
-"""
+# Offline maps installed by the runner before monitoring (see maps.py).
+REQUIRED_MAPS = ["sk", "at", "it"]
 
 
 def run_test(device, memory_tool):

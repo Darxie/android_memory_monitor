@@ -1,12 +1,14 @@
 from pathlib import Path
 from datetime import datetime
 from typing import Optional
+import os
 import sys
 import logging
 import threading
 import importlib
 import time
 import subprocess
+from contextlib import nullcontext
 import uiautomator2 as u2
 
 if __package__ is None and __name__ == "__main__":
@@ -20,8 +22,9 @@ from memory_tool.memory_monitor import MemoryTool
 from memory_tool.adb import AdbDevice, execute_adb_command
 from memory_tool.app_info import print_app_info
 from memory_tool.archive import archive_batch
+from memory_tool.network import device_offline
 from memory_tool.reporter import generate_batch_report, collect_run_artifacts
-from memory_tool.use_cases.protocol import validate as validate_use_case
+from memory_tool.use_cases.protocol import validate as validate_use_case, get_locations
 
 
 def setup_logging(log_path: Optional[Path] = None, level: int = logging.DEBUG) -> None:
@@ -81,7 +84,17 @@ MAESTRO_DEVICE_PACKAGES = [
     "dev.mobile.maestro.test",
     "com.google.android.apps.wearables.maestro.companion",
 ]
-
+# Killing host Maestro processes and restarting the adb server affects every
+# device on the host (e.g. other test suites on a shared CI agent). Off by
+# default; opt in with MEMORY_TOOL_ALLOW_HOST_DISRUPTION=1.
+ALLOW_HOST_DISRUPTION = os.environ.get("MEMORY_TOOL_ALLOW_HOST_DISRUPTION") == "1"
+RUNTIME_PERMISSIONS = [
+    "android.permission.ACCESS_FINE_LOCATION",
+    "android.permission.ACCESS_COARSE_LOCATION",
+    "android.permission.ACCESS_BACKGROUND_LOCATION",
+    "android.permission.POST_NOTIFICATIONS",
+]
+STARTUP_AGREEMENT_DIALOGS_MAX = 4
 
 
 def _is_uiautomator_already_registered_error(error: Exception) -> bool:
@@ -181,10 +194,18 @@ def _restart_adb_server(adb: AdbDevice) -> None:
         logging.warning("Device %s did not become ready after adb restart", adb.device_code)
 
 
-def _prepare_automation_environment(adb: AdbDevice) -> None:
-    """Preflight cleanup to minimize automation framework conflicts."""
+def _disrupt_host(adb: AdbDevice) -> None:
+    """Host-wide cleanup (Maestro kill + adb restart); only when explicitly allowed."""
+    if not ALLOW_HOST_DISRUPTION:
+        logging.info("Skipping host-wide cleanup (set MEMORY_TOOL_ALLOW_HOST_DISRUPTION=1 to enable)")
+        return
     _kill_host_maestro_processes()
     _restart_adb_server(adb)
+
+
+def _prepare_automation_environment(adb: AdbDevice) -> None:
+    """Preflight cleanup to minimize automation framework conflicts."""
+    _disrupt_host(adb)
     _stop_conflicting_device_automation_services(adb)
     time.sleep(UIAUTOMATOR_RECOVERY_WAIT_SECONDS)
 
@@ -192,8 +213,7 @@ def _prepare_automation_environment(adb: AdbDevice) -> None:
 def _recover_uiautomator_session(adb: AdbDevice, aggressive: bool = False) -> None:
     """Best-effort cleanup of stale uiautomator processes on the target device."""
     logging.warning("Attempting UiAutomator recovery on device %s", adb.device_code)
-    _kill_host_maestro_processes()
-    _restart_adb_server(adb)
+    _disrupt_host(adb)
     _stop_conflicting_device_automation_services(adb)
 
     if aggressive:
@@ -204,6 +224,37 @@ def _recover_uiautomator_session(adb: AdbDevice, aggressive: bool = False) -> No
 
     # Give Android a short grace period to release the stale accessibility binding.
     time.sleep(UIAUTOMATOR_RECOVERY_WAIT_SECONDS)
+
+
+def required_maps_for(use_case_module, location=None) -> list:
+    """Map ISO codes a use case needs: REQUIRED_MAPS, or LOCATIONS[location]["required_maps"] for variants."""
+    locations = get_locations(use_case_module)
+    if locations is not None:
+        key = location or getattr(use_case_module, "DEFAULT_LOCATION", None)
+        return list(locations.get(key, {}).get("required_maps", []))
+    return list(getattr(use_case_module, "REQUIRED_MAPS", []))
+
+
+def _grant_runtime_permissions(adb: AdbDevice, package_name: str) -> None:
+    """Pre-grant runtime permissions so system permission dialogs never block the UI flow."""
+    for permission in RUNTIME_PERMISSIONS:
+        adb.shell("pm", "grant", package_name, permission, timeout=15)
+
+
+def _dismiss_startup_agreements(device) -> None:
+    """
+    Accept first-run agreement dialogs. A fresh install shows several in a row
+    ("Your Safety", then "We value your privacy"), all with agree_button.
+    """
+    agree_button = device(resourceId="agree_button")
+    timeout = 30
+    for _ in range(STARTUP_AGREEMENT_DIALOGS_MAX):
+        if not agree_button.exists(timeout=timeout):
+            return
+        logging.info("Dismissing startup agreement dialog")
+        agree_button.click()
+        time.sleep(1)
+        timeout = 5
 
 
 def initialize_device(package_name, device_code, start_activity=None):
@@ -233,6 +284,7 @@ def initialize_device(package_name, device_code, start_activity=None):
             except Exception:
                 logging.info(f"Connected to device: {device_code} (device.info unavailable)")
             device.screen_on()
+            _grant_runtime_permissions(adb, package_name)
 
             if start_activity:
                 logging.info(f"Starting activity: {start_activity}")
@@ -242,10 +294,7 @@ def initialize_device(package_name, device_code, start_activity=None):
                 logging.info(f"Starting package: {package_name}")
                 device.app_start(package_name)
 
-            agree_button = device(resourceId="agree_button")
-            if agree_button.exists(timeout=30):
-                logging.info("Dismissing startup agreement dialog")
-                agree_button.click()
+            _dismiss_startup_agreements(device)
 
             adb.logcat_clear()
             return device
@@ -268,9 +317,9 @@ def initialize_device(package_name, device_code, start_activity=None):
             raise
 
 
-def run_automation_tasks(app_name_internal, package_name, use_case, device_code, log_interval=5, start_activity=None, dry_run=False, output_dir=None, location=None):
+def _run_use_case(app_name_internal, package_name, use_case, device_code, log_interval=5, start_activity=None, dry_run=False, output_dir=None, location=None):
     """
-    Runs automation tasks for the given package name.
+    Run one use case with memory monitoring (maps must already be installed).
 
     Args:
         app_name_internal: Internal application name
@@ -305,6 +354,8 @@ def run_automation_tasks(app_name_internal, package_name, use_case, device_code,
         run_output_dir = writer.get_output_directory()
         memory_tool = MemoryTool(writer, package_name, device, monitoring_finished_event, log_interval, dry_run=dry_run)
 
+        use_case_module = _load_use_case_module(app_name_internal, use_case)
+
         read_about = None
         try:
             shared_module = importlib.import_module(f"memory_tool.use_cases.{app_name_internal}.shared")
@@ -321,10 +372,6 @@ def run_automation_tasks(app_name_internal, package_name, use_case, device_code,
 
         # Execute use case
         try:
-            module_name = f"memory_tool.use_cases.{app_name_internal}.{use_case}"
-            logging.info(f"Loading use case module: {module_name}")
-            use_case_module = importlib.import_module(module_name)
-            validate_use_case(use_case_module)
             if location is not None:
                 use_case_module.run_test(device, memory_tool, location=location)
             else:
@@ -361,7 +408,50 @@ def run_automation_tasks(app_name_internal, package_name, use_case, device_code,
     return {"use_case": use_case, "output_dir": None, "location": location}
 
 
-def run_automation_batch(app_name_internal, package_name, device_code, log_interval=5, start_activity=None, use_cases=None, dry_run=False):
+def _load_use_case_module(app_name_internal, use_case):
+    module_name = f"memory_tool.use_cases.{app_name_internal}.{use_case}"
+    logging.info(f"Loading use case module: {module_name}")
+    use_case_module = importlib.import_module(module_name)
+    validate_use_case(use_case_module)
+    return use_case_module
+
+
+def prepare_maps(app_name_internal, package_name, device_code, maps, start_activity=None):
+    """
+    Launch the app, install/update the given maps (needs internet) and stop the app again,
+    so the measured runs that follow start cold and can run offline.
+    """
+    if not maps:
+        return
+    maps_module = importlib.import_module(f"memory_tool.use_cases.{app_name_internal}.maps")
+    device = initialize_device(package_name, device_code, start_activity)
+    try:
+        maps_module.ensure_maps(device, AdbDevice(device_code), package_name, maps)
+    finally:
+        device.app_stop(package_name)
+
+
+def run_automation_tasks(app_name_internal, package_name, use_case, device_code, log_interval=5, start_activity=None, dry_run=False, output_dir=None, location=None, offline=True, maps_ready=False):
+    """
+    Runs automation tasks for the given package name.
+
+    Installs the use case's required maps first (unless maps_ready), then runs it
+    with Wi-Fi and mobile data disabled (unless offline=False). See _run_use_case
+    for the remaining arguments.
+    """
+    if not maps_ready:
+        maps = required_maps_for(_load_use_case_module(app_name_internal, use_case), location)
+        prepare_maps(app_name_internal, package_name, device_code, maps, start_activity)
+
+    network = device_offline(AdbDevice(device_code)) if offline else nullcontext()
+    with network:
+        return _run_use_case(
+            app_name_internal, package_name, use_case, device_code, log_interval,
+            start_activity=start_activity, dry_run=dry_run, output_dir=output_dir, location=location,
+        )
+
+
+def run_automation_batch(app_name_internal, package_name, device_code, log_interval=5, start_activity=None, use_cases=None, dry_run=False, offline=True):
     """
     Run multiple use-cases sequentially and generate one aggregate HTML report.
 
@@ -372,6 +462,8 @@ def run_automation_batch(app_name_internal, package_name, device_code, log_inter
         log_interval: Seconds between memory checks
         start_activity: Optional specific activity to launch
         use_cases: Optional explicit sequence of use-cases
+        offline: Run the use cases with Wi-Fi and mobile data disabled. Maps for the
+            whole sequence are installed up front while still online.
 
     Returns:
         Dictionary with run artifacts and final batch report path
@@ -381,15 +473,41 @@ def run_automation_batch(app_name_internal, package_name, device_code, log_inter
     batch_dir = Path(f"output/{batch_timestamp}_batch")
     batch_dir.mkdir(parents=True, exist_ok=True)
     setup_logging(batch_dir / "python_run_log.txt")
-    run_artifacts = []
 
+    maps = set()
+    for entry in sequence:
+        use_case, location = normalize_sequence_entry(entry)
+        maps.update(required_maps_for(_load_use_case_module(app_name_internal, use_case), location))
+    prepare_maps(app_name_internal, package_name, device_code, sorted(maps), start_activity)
+
+    network = device_offline(AdbDevice(device_code)) if offline else nullcontext()
+    with network:
+        run_artifacts = _run_batch_sequence(
+            sequence, app_name_internal, package_name, device_code, log_interval,
+            start_activity, dry_run, batch_dir,
+        )
+
+    batch_report = generate_batch_report(run_artifacts, app_name_internal, output_dir=batch_dir)
+    archive_result = archive_batch(run_artifacts, app_name_internal)
+    return {
+        "sequence": sequence,
+        "runs": run_artifacts,
+        "batch_report": batch_report,
+        "archive": archive_result,
+        "batch_dir": batch_dir,
+    }
+
+
+def _run_batch_sequence(sequence, app_name_internal, package_name, device_code, log_interval,
+                        start_activity, dry_run, batch_dir) -> list:
+    run_artifacts = []
     for entry in sequence:
         use_case, location = normalize_sequence_entry(entry)
         sub_dir_name = use_case if location is None else f"{use_case}_{location}"
         logging.info(f"Starting batch use-case: {format_sequence_entry(entry)}")
         ExecutionTimestamp.reset()
         try:
-            artifacts = run_automation_tasks(
+            artifacts = _run_use_case(
                 app_name_internal,
                 package_name,
                 use_case,
@@ -402,19 +520,10 @@ def run_automation_batch(app_name_internal, package_name, device_code, log_inter
             )
         except Exception as e:
             logging.error(f"Batch use-case {format_sequence_entry(entry)} failed, continuing: {e}")
-            if "10061" in str(e) or "10054" in str(e):
+            if ("10061" in str(e) or "10054" in str(e)) and ALLOW_HOST_DISRUPTION:
                 logging.warning("ADB connection lost — restarting adb server before next use case")
                 execute_adb_command(["adb", "kill-server"], timeout=10)
                 execute_adb_command(["adb", "start-server"], timeout=30)
             artifacts = {"use_case": use_case, "location": location, "error": str(e)}
         run_artifacts.append(artifacts)
-
-    batch_report = generate_batch_report(run_artifacts, app_name_internal, output_dir=batch_dir)
-    archive_result = archive_batch(run_artifacts, app_name_internal)
-    return {
-        "sequence": sequence,
-        "runs": run_artifacts,
-        "batch_report": batch_report,
-        "archive": archive_result,
-        "batch_dir": batch_dir,
-    }
+    return run_artifacts

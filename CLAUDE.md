@@ -146,10 +146,10 @@ Runner calls `validate(module)` after `importlib.import_module`; missing `run_te
 raises `ImportError` immediately, not at execution time. The `location` keyword
 is only used by variant-aware modules (see below).
 
-Module-level "NECESSARY MAPS" strings in use case files are documentation. The
-canonical per-use-case maps live in `dashboard/data/use_cases.json` (which the
-dashboard reads to render the "Required Maps" overview at the top). For
-variant-aware use cases, maps live under `variants.<key>.maps`.
+Use cases declare their offline maps in `REQUIRED_MAPS` (installed automatically,
+see "Automatic maps" below). `dashboard/data/use_cases.json` holds the
+human-readable map names the dashboard shows in its "Required Maps" overview
+(variant-aware use cases: `variants.<key>.maps`); keep both in sync.
 
 ### Variant-aware use cases
 
@@ -235,7 +235,39 @@ that derives paths from `ExecutionTimestamp` — see "Anti-patterns" below.
 - **`archive_manual.py`** accepts both batch dirs (auto-expands to subdirs) and
   individual use-case dirs. Replaces existing dashboard entry for the same SDK.
 
+- **Unmodified Volvo app (landscape).** The harness targets the stock `volvo`
+  flavor (`com.sygic.profi.volvo`, `.debug` for debug builds) with no local
+  patches. It is landscape-only: route planner / POI detail are a left-side
+  panel, so scroll inside the panel (see `demonstrate._expand_route_planner_sheet`)
+  and avoid hardcoded coordinates. Measure on **release** builds — debug ships
+  LeakCanary.
+- **Automatic maps (`use_cases/sygic_profi/maps.py`).** Use cases declare
+  `REQUIRED_MAPS = ["sk", "at", ...]` (variant-aware ones:
+  `LOCATIONS[key]["required_maps"]`), ISO codes as in the map manager's
+  `MapItem.<iso>` tags (`de` = all German regions, `us-sc` = South Carolina).
+  `runner.prepare_maps` sends the app's deep link `com.sygic.aura://update|<isos>`
+  (downloads missing, updates installed), waits on Menu → Maps until the
+  "Downloading" banner is gone, verifies every `MapItem`, then stops the app.
+  A batch does this once for the union of all its use cases.
+- **Offline runs (`memory_tool/network.py`).** After maps are ready, use cases run
+  inside `device_offline(adb)` (Wi-Fi + mobile data off via `svc`, restored to
+  the previous state afterwards). `offline=False` on `run_automation_tasks` /
+  `run_automation_batch` disables it.
+- **Startup.** Location (+ notification) permissions are pre-granted with
+  `pm grant`; every launch shows "Your Safety" and a fresh install also the
+  privacy dialog — `_dismiss_startup_agreements` clicks all `agree_button`s.
+- **Zoom** uses the on-map controls: tap `ZoomControlsCollapsed` to expand a
+  +/3D/- column (all share that tag), pick + / - by position. The column
+  collapses after ~6 s idle, so it is re-expanded every iteration.
+
 ## Anti-patterns to avoid
+
+- **Host-wide side effects.** Killing host Maestro processes or `adb kill-server`
+  breaks other devices/test suites on the same machine (shared Azure agent).
+  Only done with `MEMORY_TOOL_ALLOW_HOST_DISRUPTION=1`. Everything else must be
+  scoped to the target serial.
+- **`device.swipe()` (uiautomator2).** Crashes the on-device server on Pixel 10
+  Pro. Use `shared.scroll_list` / `input swipe` via `device.shell`.
 
 - **Module-level disk side-effects.** `mkdir()` at module load creates phantom
   folders before any use case runs (this happened in `plotter.py` line 23 —

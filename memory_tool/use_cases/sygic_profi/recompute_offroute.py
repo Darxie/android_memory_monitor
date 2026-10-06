@@ -8,20 +8,22 @@ the device is constantly off-route — exercises the recompute memory paths.
 
 Requirements:
     1. Mock Locations app (ru.gavrikov.mocklocations) installed.
-    2. Developer Options → Select mock location app → Mock Locations.
+    2. Mock Locations is set as mock location app automatically (appops).
     3. A saved route preset in Mock Locations covering 
-        City Stade Brun, Bordeaux, France → Vlak bus shopping, Banska Bystrica, Slovakia
-    4. Sygic must already have necessary maps downloaded (see use_cases.json).
+        City Stade Brun, Bordeaux, France → Bratislava, Slovakia
+    4. Required maps (REQUIRED_MAPS) are installed by the runner before monitoring.
 
 The Mock Locations selectors below are best-guess. The first time you run this,
 buttons that can't be found will dump the current UI hierarchy to
 `output/_debug_<name>.xml` so you can pick correct selectors.
 
-Necessary maps: France, Germany, Slovakia, Austria, Switzerland, Czechia
 """
 import time
 import logging
 from . import shared
+
+# Saved route Bratislava <-> Bordeaux plus the off-route detours around it.
+REQUIRED_MAPS = ["sk", "at", "cz", "de", "ch", "fr"]
 
 # Test duration
 DURATION_SECONDS_FULL = 36000   # 10 hours
@@ -31,12 +33,11 @@ DURATION_SECONDS_DRY_RUN = 60  # 5 minutes for dashboard validation
 ROUTE_DEST_QUERY = "Paris, France"
 
 # Sygic
-SYGIC_PACKAGE = "com.sygic.profi.volvo"
 SYGIC_ACTIVITY = "com.sygic.profi.platform.splashscreen.feature.ui.main.SplashScreenActivity"
 
 # Mock Locations
 MOCK_LOCATIONS_PACKAGE = "ru.gavrikov.mocklocations"
-SAVED_ROUTE_NAME = "bordeaux-banska"  # Name of the saved route preset to load
+SAVED_ROUTE_NAME = "bordeaux-bratislava"  # Name of the saved route preset to load
 
 # --- Mock Locations UI selectors ---
 # Validate after first run via the _debug_*.xml dumps in output/.
@@ -93,6 +94,11 @@ def _setup_sygic_route(device):
 
 def _start_mock_location(device, memory_tool):
     """Force-stop Mock Locations for a clean state, then launch and start the saved route."""
+    # Same as Developer options -> Select mock location app.
+    memory_tool.adb.shell("appops", "set", MOCK_LOCATIONS_PACKAGE, "android:mock_location", "allow")
+    # Pre-grant so the system location prompt never covers its buttons.
+    for permission in ("ACCESS_FINE_LOCATION", "ACCESS_COARSE_LOCATION"):
+        memory_tool.adb.shell("pm", "grant", MOCK_LOCATIONS_PACKAGE, f"android.permission.{permission}")
     memory_tool.adb.shell("am", "force-stop", MOCK_LOCATIONS_PACKAGE)
     time.sleep(1)
 
@@ -144,7 +150,7 @@ def _stop_mock_location(device, memory_tool):
 
 
 def _bring_sygic_to_foreground(memory_tool):
-    memory_tool.adb.shell("am", "start", "-n", f"{SYGIC_PACKAGE}/{SYGIC_ACTIVITY}")
+    memory_tool.adb.shell("am", "start", "-n", f"{memory_tool.package_name}/{SYGIC_ACTIVITY}")
     time.sleep(2)
 
 

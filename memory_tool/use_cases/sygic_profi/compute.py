@@ -3,9 +3,8 @@ import logging
 from . import shared
 
 
-"""
-NECESSARY MAPS - Slovakia, Austria
-"""
+# Offline maps installed by the runner before monitoring (see maps.py).
+REQUIRED_MAPS = ["sk", "at"]
 
 ITERATIONS_FULL = 100
 ITERATIONS_DRY_RUN = 5

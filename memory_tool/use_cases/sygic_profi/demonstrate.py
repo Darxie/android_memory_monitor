@@ -2,9 +2,8 @@ import time
 import logging
 from . import shared
 
-"""
-NECESSARY MAPS - Slovakia, Austria, Germany
-"""
+# Offline maps installed by the runner before monitoring (see maps.py).
+REQUIRED_MAPS = ["sk", "at", "de"]
 
 BOTTOM_SHEET_CONTENT_ID = "com.sygic.profi.volvo:id/routePlannerDetailBottomSheetContent"
 DEMONSTRATE_ROUTE_RESOURCE_IDS = [
@@ -20,6 +19,8 @@ ROUTE_PLANNER_READY_IDS = [
     "RoutePlannerToolbar.BackButton",
     "RoutePlanner.RouteSelect",
 ]
+# Each attempt scrolls the planner panel once; landscape needs ~3 drags to reach the button.
+DEMONSTRATE_BUTTON_ATTEMPTS = 6
 DEMONSTRATION_SECONDS_FULL = 43200  # 12 hours
 DEMONSTRATION_SECONDS_DRY_RUN = 60  # 5 minutes
 
@@ -74,28 +75,30 @@ def _demonstrate_route_xpath(device):
 
 def _expand_route_planner_sheet(device) -> bool:
     """
-    Expand the collapsed Volvo route-planner bottom sheet to reveal its buttons.
+    Expand / scroll the Volvo route-planner sheet to reveal its buttons.
 
-    Dismissing the vehicle-settings warning collapses the route-planner bottom
-    sheet, hiding the Demonstrate route button. Drag the sheet handle
-    (RoutePlannerBottomSheetContent.Box) up to expand it. Returns True if the
-    sheet was found and a swipe was issued.
+    In landscape the planner is a left-side panel whose content (Demonstrate
+    route sits at the bottom) needs a few drags to scroll into view; dismissing
+    the vehicle-settings warning also collapses it. Drag upwards inside the
+    panel, horizontally centred on RoutePlannerBottomSheetContent.Box — a drag
+    in the middle of the screen would only pan the map. Returns True if the
+    sheet was found and a drag was issued.
     """
     box = device(resourceId="RoutePlannerBottomSheetContent.Box")
     if not box.exists(timeout=2):
         return False
 
-    width = device.info.get("displayWidth", 1080)
-    height = device.info.get("displayHeight", 2400)
-    start_y = int(height * 0.82)
+    width, height = device.window_size()
+    x = width // 2
     try:
         bounds = box.info.get("visibleBounds") or box.info.get("bounds") or {}
-        if bounds.get("top") is not None and bounds.get("bottom") is not None:
-            start_y = (bounds["top"] + bounds["bottom"]) // 2
+        if bounds.get("left") is not None and bounds.get("right") is not None:
+            x = (bounds["left"] + bounds["right"]) // 2
     except Exception as e:
         logging.debug("Failed to read route-planner sheet bounds: %s", e)
 
-    device.swipe(width // 2, start_y, width // 2, int(height * 0.2), 0.2)
+    # input swipe instead of device.swipe(): the latter crashes uiautomator2 on some devices.
+    device.shell(["input", "swipe", str(x), str(int(height * 0.88)), str(x), str(int(height * 0.3)), "300"])
     time.sleep(1)
     return True
 
@@ -140,7 +143,7 @@ def _click_demonstrate_route(device):
     warning or by the bottom sheet collapsing after that warning is dismissed, so
     each retry both dismisses the warning and expands the sheet.
     """
-    for _ in range(4):
+    for _ in range(DEMONSTRATE_BUTTON_ATTEMPTS):
         for resource_id in DEMONSTRATE_ROUTE_RESOURCE_IDS:
             candidate = device(resourceId=resource_id)
             if candidate.exists(timeout=2):

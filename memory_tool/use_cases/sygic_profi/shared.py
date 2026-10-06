@@ -21,6 +21,30 @@ def dump_hierarchy(device, name: str) -> None:
         logging.warning("Failed to dump hierarchy: %s", e)
 
 
+def scroll_list(device, up: bool = True) -> None:
+    """
+    Scroll the current list by one step (up=True reveals items further down).
+
+    Uses `input swipe` rather than device.swipe(): uiautomator2's swipe crashes
+    its on-device server on some devices (Pixel 10 Pro).
+    """
+    width, height = device.window_size()
+    low, high = int(height * 0.8), int(height * 0.35)
+    start, end = (low, high) if up else (high, low)
+    device.shell(["input", "swipe", str(width // 2), str(start), str(width // 2), str(end), "250"])
+    time.sleep(0.5)
+
+
+def scroll_to_resource_id(device, resource_id: str, max_swipes: int = 8):
+    """Scroll down until the element is on screen; returns its selector (may not exist)."""
+    selector = device(resourceId=resource_id)
+    for _ in range(max_swipes):
+        if selector.exists(timeout=1):
+            break
+        scroll_list(device)
+    return selector
+
+
 def _get_selector_center(selector):
     """Return selector center coordinates from uiautomator bounds info, if available."""
     try:
@@ -364,7 +388,8 @@ def read_about_screen(device):
             "Neither SearchBar.MenuIcon nor SearchBar.ProfileIcon was found"
         )
     device(resourceId="MainMenu.Settings").click()
-    device(resourceId="Settings.Info").click()
+    # Landscape shows only ~4 settings rows; Info is at the bottom.
+    scroll_to_resource_id(device, "Settings.Info").click()
     device(resourceId="Settings.Info.About").click()
     device(resourceId="Settings.Info.Product").click()
 
