@@ -10,7 +10,7 @@ Requirements:
     1. Mock Locations app (ru.gavrikov.mocklocations) installed.
     2. Mock Locations is set as mock location app automatically (appops).
     3. A saved route preset in Mock Locations covering 
-        City Stade Brun, Bordeaux, France → Bratislava, Slovakia
+        City Stade Brun, Bordeaux, France → Vlak bus shopping, Banska Bystrica, Slovakia
     4. Required maps (REQUIRED_MAPS) are installed by the runner before monitoring.
 
 The Mock Locations selectors below are best-guess. The first time you run this,
@@ -22,7 +22,7 @@ import time
 import logging
 from . import shared
 
-# Saved route Bratislava <-> Bordeaux plus the off-route detours around it.
+# Saved route Banska Bystrica <-> Bordeaux plus the off-route detours around it.
 REQUIRED_MAPS = ["sk", "at", "cz", "de", "ch", "fr"]
 
 # Test duration
@@ -37,7 +37,7 @@ SYGIC_ACTIVITY = "com.sygic.profi.platform.splashscreen.feature.ui.main.SplashSc
 
 # Mock Locations
 MOCK_LOCATIONS_PACKAGE = "ru.gavrikov.mocklocations"
-SAVED_ROUTE_NAME = "bordeaux-bratislava"  # Name of the saved route preset to load
+SAVED_ROUTE_NAME = "bordeaux-banska"  # Name of the saved route preset to load
 
 # --- Mock Locations UI selectors ---
 # Validate after first run via the _debug_*.xml dumps in output/.
