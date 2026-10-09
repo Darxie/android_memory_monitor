@@ -198,3 +198,16 @@ def test_archive_batch_skips_artifacts_with_missing_csv(dashboard_root):
     art = make_artifact(src, "compute", "28.4.13")
     Path(art["csv"]).unlink()  # delete CSV before archiving
     assert archive.archive_batch([art], "sygic_profi") is None
+
+
+def test_archive_batch_refuses_unreadable_manifest(dashboard_root):
+    src = dashboard_root / "src"
+    archive.MANIFEST_PATH.write_text("{not json", encoding="utf-8")
+    with pytest.raises(RuntimeError, match="unreadable"):
+        archive.archive_batch([make_artifact(src, "compute", "28.4.13")], "sygic_profi")
+    assert archive.MANIFEST_PATH.read_text(encoding="utf-8") == "{not json"
+
+
+def test_dashboard_dir_is_anchored_to_repo():
+    assert archive.DASHBOARD_DIR.is_absolute()
+    assert (archive.DASHBOARD_DIR / "data" / "manifest.json").exists()

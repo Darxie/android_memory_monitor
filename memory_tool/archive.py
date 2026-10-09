@@ -13,7 +13,9 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-DASHBOARD_DIR = Path("dashboard")
+# Anchored to the repo, not the working directory: launching the GUI from memory_tool/
+# once wrote a fresh manifest to memory_tool/dashboard/ instead of extending the real one.
+DASHBOARD_DIR = Path(__file__).resolve().parent.parent / "dashboard"
 DASHBOARD_DATA_DIR = DASHBOARD_DIR / "data"
 DASHBOARD_RUNS_DIR = DASHBOARD_DATA_DIR / "runs"
 MANIFEST_PATH = DASHBOARD_DATA_DIR / "manifest.json"
@@ -54,8 +56,8 @@ def _load_manifest() -> dict:
     try:
         return json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as e:
-        logging.warning("Manifest unreadable, starting fresh: %s", e)
-        return {"runs": []}
+        # Never start fresh over an existing manifest: that would drop every archived run.
+        raise RuntimeError(f"Manifest {MANIFEST_PATH} is unreadable; fix it before archiving: {e}") from e
 
 
 def _write_manifest(manifest: dict) -> None:
