@@ -1,6 +1,5 @@
 """Serve the dashboard locally on http://localhost:8000."""
 import http.server
-import socketserver
 import webbrowser
 from pathlib import Path
 
@@ -11,7 +10,9 @@ def main():
     dashboard_root = Path(__file__).resolve().parent
     handler = http.server.SimpleHTTPRequestHandler
 
-    with socketserver.TCPServer(("127.0.0.1", PORT), handler) as httpd:
+    # Threaded: a single-threaded server stalls every other browser while one
+    # keeps an idle keep-alive/preconnect socket open.
+    with http.server.ThreadingHTTPServer(("127.0.0.1", PORT), handler) as httpd:
         url = f"http://localhost:{PORT}/index.html"
         print(f"Serving {dashboard_root} on {url}")
         print("Press Ctrl+C to stop.")

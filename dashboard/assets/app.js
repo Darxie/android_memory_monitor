@@ -1,6 +1,10 @@
 const MANIFEST_URL = "data/manifest.json";
 const USE_CASES_URL = "data/use_cases.json";
 const FETCH_OPTS = { cache: "no-store" };
+// Fixed-duration scenarios: their sample count is real elapsed time, never resampled.
+const TIME_BASED_USE_CASES = new Set(["demonstrate", "recompute_offroute", "demon_fg_bg", "freedrive"]);
+// Common x-axis length for every other (iteration-based) use case.
+const RESAMPLED_LENGTH = 200;
 
 function pickMemoryUnit(maxKb) {
   const maxMb = maxKb / 1024;
@@ -145,6 +149,20 @@ async function loadCsvTotalMemory(path) {
   return samples;
 }
 
+// Linear interpolation of values onto n evenly spaced points (keeps first and last sample).
+function resample(values, n) {
+  if (values.length === n || values.length < 2 || n < 2) return values;
+  const out = new Array(n);
+  const step = (values.length - 1) / (n - 1);
+  for (let i = 0; i < n; i++) {
+    const pos = i * step;
+    const lo = Math.floor(pos);
+    const hi = Math.min(lo + 1, values.length - 1);
+    out[i] = values[lo] + (values[hi] - values[lo]) * (pos - lo);
+  }
+  return out;
+}
+
 function collectUseCases(runs) {
   const seen = new Set();
   for (const run of runs) {
@@ -210,6 +228,12 @@ function plotlyLayout(unit) {
 }
 
 async function renderChartFor(plotDiv, sdksEl, useCase, runs, variant) {
+  // Switching variants while CSVs still load must not let an older, slower
+  // render overwrite the newer one.
+  const renderId = (plotDiv._renderId || 0) + 1;
+  plotDiv._renderId = renderId;
+  sdksEl.textContent = "Loading…";
+
   const sortedRuns = [...runs].sort((a, b) => compareSdk(a.sdk, b.sdk));
 
   const rawSeries = [];
@@ -226,11 +250,21 @@ async function renderChartFor(plotDiv, sdksEl, useCase, runs, variant) {
       console.warn("Skipping", csvPath, err);
     }
   }
+  if (plotDiv._renderId !== renderId) return;
 
   if (!rawSeries.length) {
     sdksEl.textContent = "No data for this selection.";
     if (window.Plotly) Plotly.purge(plotDiv);
     return;
+  }
+
+  // Iteration-based runs can take longer on slower builds/setups (more samples for
+  // the same iterations). Stretch/compress every series onto RESAMPLED_LENGTH points
+  // so the curves span the same width; the archived CSVs stay untouched. Time-based
+  // use cases keep real lengths — stretching a shorter run would misrepresent it.
+  const resampleSeries = !TIME_BASED_USE_CASES.has(useCase);
+  if (resampleSeries) {
+    for (const s of rawSeries) s.totals = resample(s.totals, RESAMPLED_LENGTH);
   }
 
   const unit = pickMemoryUnit(maxKb);
@@ -245,7 +279,8 @@ async function renderChartFor(plotDiv, sdksEl, useCase, runs, variant) {
     hovertemplate: `<b>SDK ${sdk}</b><br>sample %{x}<br>%{y:,.${unit.decimals}f} ${unit.name}<extra></extra>`,
   }));
 
-  sdksEl.textContent = `SDKs: ${rawSeries.map((s) => s.sdk).join(", ")}`;
+  sdksEl.textContent = `SDKs: ${rawSeries.map((s) => s.sdk).join(", ")}`
+    + (resampleSeries ? ` · resampled to ${RESAMPLED_LENGTH} samples` : "");
 
   Plotly.newPlot(
     plotDiv,
