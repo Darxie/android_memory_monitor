@@ -221,6 +221,23 @@
         "demonstrate": "data/runs/20261031_065000_sdk44.0.0/demonstrate.csv",
         "recompute_offroute": "data/runs/20261031_065000_sdk44.0.0/recompute_offroute.csv"
       }
+    },
+    {
+      "id": "20261121_022727_sdk45.0.1",
+      "sdk": "45.0.1",
+      "date": "2026-11-21T02:27:27",
+      "app": "sygic_profi",
+      "use_cases": {
+        "compute": "data/runs/20261121_022727_sdk45.0.1/compute.csv",
+        "search": "data/runs/20261121_022727_sdk45.0.1/search.csv",
+        "fg_bg": "data/runs/20261121_022727_sdk45.0.1/fg_bg.csv",
+        "zoom": {
+          "nepal": "data/runs/20261121_022727_sdk45.0.1/zoom_nepal.csv",
+          "paris": "data/runs/20261121_022727_sdk45.0.1/zoom_paris.csv"
+        },
+        "demonstrate": "data/runs/20261121_022727_sdk45.0.1/demonstrate.csv",
+        "recompute_offroute": "data/runs/20261121_022727_sdk45.0.1/recompute_offroute.csv"
+      }
     }
   ]
 }
